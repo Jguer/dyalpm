@@ -9,7 +9,7 @@ RUN set -eux; \
     pacman-key --init; \
     sed -i 's/^#DisableSandboxFilesystem/DisableSandboxFilesystem/' /etc/pacman.conf; \
     sed -i 's/^#DisableSandboxSyscalls/DisableSandboxSyscalls/' /etc/pacman.conf; \
-    pacman -Syu --noconfirm --needed pacman-contrib fish git-delta openssh bat go github-cli archlinux-keyring pacman go git gcc make base-devel sudo asciidoc doxygen meson; \
+    pacman -Syu --noconfirm --needed pacman-contrib fish git-delta openssh ripgrep bat go github-cli archlinux-keyring pacman go git gcc make base-devel sudo asciidoc doxygen meson; \
     curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v2.7.2; \
     rm -rf /var/lib/pacman/sync/* /var/cache/pacman/* /tmp/* /var/tmp/*; \
     rm -rf /usr/share/man/* /usr/share/doc/* || true; \
