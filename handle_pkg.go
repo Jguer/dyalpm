@@ -1,10 +1,7 @@
 package dyalpm
 
 import (
-	"runtime"
-	"unsafe"
-
-	"github.com/ebitengine/purego"
+	stderrors "errors"
 
 	"github.com/Jguer/dyalpm/internal/dyerrors"
 	"github.com/Jguer/dyalpm/internal/lib"
@@ -15,20 +12,18 @@ func (h *handle) LoadPackage(filename string, full bool, siglevel int) (Package,
 		return nil, dyerrors.ErrHandleNull
 	}
 
-	fn, err := h.registry.GetFunc("alpm_pkg_load")
-	if err != nil {
-		return nil, err
+	if lib.AlpmPkgLoad == nil {
+		return nil, stderrors.New("missing function: alpm_pkg_load")
 	}
 
-	cFilename := lib.CString(filename)
-	filenamePtr := uintptr(unsafe.Pointer(&cFilename[0]))
-
 	var pkgPtr uintptr
+	fullInt := int32(0)
+	if full {
+		fullInt = 1
+	}
+	result := lib.AlpmPkgLoad(h.ptr, filename, fullInt, int32(siglevel), &pkgPtr)
 
-	r1, _, _ := purego.SyscallN(fn, h.ptr, filenamePtr, lib.BoolToInt(full), uintptr(siglevel), uintptr(unsafe.Pointer(&pkgPtr)))
-	runtime.KeepAlive(cFilename)
-
-	if r1 != 0 {
+	if result != 0 {
 		return nil, dyerrors.NewError(h.Errno(), "failed to load package")
 	}
 

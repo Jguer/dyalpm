@@ -1,12 +1,8 @@
 package list
 
 import (
-	"sync"
-	"unsafe"
-
-	"github.com/ebitengine/purego"
-
 	"github.com/Jguer/dyalpm/internal/lib"
+	"unsafe"
 )
 
 // List represents an ALPM list node
@@ -99,11 +95,8 @@ func (l *List) Count() int {
 	if l == nil || l.ptr == 0 {
 		return 0
 	}
-
-	// Lazy load the function
-	fn := getCountFunc()
-	if fn == 0 {
-		// Fallback: manual counting
+	var result uintptr
+	if lib.AlpmListCount == nil {
 		count := 0
 		current := l
 		for current != nil && current.ptr != 0 {
@@ -112,29 +105,8 @@ func (l *List) Count() int {
 		}
 		return count
 	}
-
-	var result uintptr
-	purego.SyscallN(fn, l.ptr, uintptr(unsafe.Pointer(&result)))
+	lib.AlpmListCount(l.ptr, &result)
 	return int(result)
-}
-
-var (
-	countFuncOnce sync.Once
-	countFunc     uintptr
-)
-
-func getCountFunc() uintptr {
-	countFuncOnce.Do(func() {
-		reg, err := lib.GetRegistry()
-		if err != nil {
-			return
-		}
-		fn, err := reg.GetFunc("alpm_list_count")
-		if err == nil {
-			countFunc = fn
-		}
-	})
-	return countFunc
 }
 
 // ToSlice converts the list to a Go slice of pointers
@@ -158,60 +130,20 @@ func (l *List) Free() {
 	if l == nil || l.ptr == 0 {
 		return
 	}
-	fn := getFreeFunc()
-	if fn != 0 {
-		purego.SyscallN(fn, l.ptr)
+	if lib.AlpmListFree != nil {
+		lib.AlpmListFree(l.ptr)
 	}
 }
 
 // Add adds data to the list and returns the new list head
 func Add(l *List, data uintptr) *List {
-	fn := getAddFunc()
-	if fn == 0 {
+	if lib.AlpmListAdd == nil {
 		return nil
 	}
 	var ptr uintptr
 	if l != nil {
 		ptr = l.ptr
 	}
-	r1, _, _ := purego.SyscallN(fn, ptr, data)
+	r1 := lib.AlpmListAdd(ptr, data)
 	return NewList(r1)
-}
-
-var (
-	addFuncOnce sync.Once
-	addFunc     uintptr
-)
-
-func getAddFunc() uintptr {
-	addFuncOnce.Do(func() {
-		reg, err := lib.GetRegistry()
-		if err != nil {
-			return
-		}
-		fn, err := reg.GetFunc("alpm_list_add")
-		if err == nil {
-			addFunc = fn
-		}
-	})
-	return addFunc
-}
-
-var (
-	freeFuncOnce sync.Once
-	freeFunc     uintptr
-)
-
-func getFreeFunc() uintptr {
-	freeFuncOnce.Do(func() {
-		reg, err := lib.GetRegistry()
-		if err != nil {
-			return
-		}
-		fn, err := reg.GetFunc("alpm_list_free")
-		if err == nil {
-			freeFunc = fn
-		}
-	})
-	return freeFunc
 }

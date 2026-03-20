@@ -1,10 +1,8 @@
 package dyalpm
 
 import (
-	"runtime"
+	stderrors "errors"
 	"unsafe"
-
-	"github.com/ebitengine/purego"
 
 	"github.com/Jguer/dyalpm/internal/dyerrors"
 	"github.com/Jguer/dyalpm/internal/lib"
@@ -63,17 +61,14 @@ func (d Depend) String() string {
 }
 
 type dependency struct {
-	ptr      uintptr
-	registry *lib.FunctionRegistry
-	owned    bool
+	ptr   uintptr
+	owned bool
 }
 
 func newDependency(ptr uintptr) *dependency {
-	reg, _ := lib.GetRegistry()
 	return &dependency{
-		ptr:      ptr,
-		registry: reg,
-		owned:    false,
+		ptr:   ptr,
+		owned: false,
 	}
 }
 
@@ -113,13 +108,11 @@ func (d *dependency) ComputeString() string {
 	if d.ptr == 0 {
 		return ""
 	}
-
-	fn := cachedFunc("alpm_dep_compute_string")
-	if fn == 0 {
+	if lib.AlpmDepComputeString == nil {
 		return ""
 	}
 
-	r1, _, _ := purego.SyscallN(fn, d.ptr)
+	r1 := lib.AlpmDepComputeString(d.ptr)
 	if r1 == 0 {
 		return ""
 	}
@@ -134,31 +127,20 @@ func (d *dependency) Free() {
 	if d.ptr == 0 || !d.owned {
 		return
 	}
-
-	fn, err := d.registry.GetFunc("alpm_dep_free")
-	if err != nil {
+	if lib.AlpmDepFree == nil {
 		return
 	}
-
-	purego.SyscallN(fn, d.ptr)
+	lib.AlpmDepFree(d.ptr)
 	d.ptr = 0
 }
 
 // DepFromString creates a dependency from a string
 func DepFromString(depstring string) (Dependency, error) {
-	reg, err := lib.GetRegistry()
-	if err != nil {
-		return nil, err
+	if lib.AlpmDepFromString == nil {
+		return nil, stderrors.New("missing function: alpm_dep_from_string")
 	}
 
-	fn, err := reg.GetFunc("alpm_dep_from_string")
-	if err != nil {
-		return nil, err
-	}
-
-	cStr := lib.CString(depstring)
-	r1, _, _ := purego.SyscallN(fn, uintptr(unsafe.Pointer(&cStr[0])))
-	runtime.KeepAlive(cStr)
+	r1 := lib.AlpmDepFromString(depstring)
 
 	if r1 == 0 {
 		return nil, ErrInvalidDependency
@@ -178,15 +160,12 @@ type DepMissing interface {
 }
 
 type depMissing struct {
-	ptr      uintptr
-	registry *lib.FunctionRegistry
+	ptr uintptr
 }
 
 func newDepMissing(ptr uintptr) *depMissing {
-	reg, _ := lib.GetRegistry()
 	return &depMissing{
-		ptr:      ptr,
-		registry: reg,
+		ptr: ptr,
 	}
 }
 
@@ -222,11 +201,10 @@ func (d *depMissing) Free() {
 	if d.ptr == 0 {
 		return
 	}
-	fn, err := d.registry.GetFunc("alpm_depmissing_free")
-	if err != nil {
+	if lib.AlpmDepmissingFree == nil {
 		return
 	}
-	purego.SyscallN(fn, d.ptr)
+	lib.AlpmDepmissingFree(d.ptr)
 	d.ptr = 0
 }
 
@@ -239,15 +217,12 @@ type Conflict interface {
 }
 
 type conflict struct {
-	ptr      uintptr
-	registry *lib.FunctionRegistry
+	ptr uintptr
 }
 
 func newConflict(ptr uintptr) *conflict {
-	reg, _ := lib.GetRegistry()
 	return &conflict{
-		ptr:      ptr,
-		registry: reg,
+		ptr: ptr,
 	}
 }
 
@@ -296,11 +271,10 @@ func (c *conflict) Free() {
 	if c.ptr == 0 {
 		return
 	}
-	fn, err := c.registry.GetFunc("alpm_conflict_free")
-	if err != nil {
+	if lib.AlpmConflictFree == nil {
 		return
 	}
-	purego.SyscallN(fn, c.ptr)
+	lib.AlpmConflictFree(c.ptr)
 	c.ptr = 0
 }
 
@@ -322,15 +296,12 @@ type FileConflict interface {
 }
 
 type fileConflict struct {
-	ptr      uintptr
-	registry *lib.FunctionRegistry
+	ptr uintptr
 }
 
 func newFileConflict(ptr uintptr) *fileConflict {
-	reg, _ := lib.GetRegistry()
 	return &fileConflict{
-		ptr:      ptr,
-		registry: reg,
+		ptr: ptr,
 	}
 }
 
@@ -375,11 +346,10 @@ func (f *fileConflict) Free() {
 	if f.ptr == 0 {
 		return
 	}
-	fn, err := f.registry.GetFunc("alpm_fileconflict_free")
-	if err != nil {
+	if lib.AlpmFileConflictFree == nil {
 		return
 	}
-	purego.SyscallN(fn, f.ptr)
+	lib.AlpmFileConflictFree(f.ptr)
 	f.ptr = 0
 }
 
@@ -389,10 +359,8 @@ func (h *handle) CheckDeps(pkgs []Package, remPkgs []Package, upgradePkgs []Pack
 	if h.ptr == 0 {
 		return nil, dyerrors.ErrHandleNull
 	}
-
-	fn, err := h.registry.GetFunc("alpm_checkdeps")
-	if err != nil {
-		return nil, err
+	if lib.AlpmCheckDeps == nil {
+		return nil, stderrors.New("missing function: alpm_checkdeps")
 	}
 
 	var pkgList, remPkgList, upgradePkgList *list.List
@@ -414,7 +382,11 @@ func (h *handle) CheckDeps(pkgs []Package, remPkgs []Package, upgradePkgs []Pack
 	}
 	defer upgradePkgList.Free()
 
-	r1, _, _ := purego.SyscallN(fn, h.ptr, pkgList.Ptr(), remPkgList.Ptr(), upgradePkgList.Ptr(), lib.BoolToInt(reverseDeps))
+	rev := int32(0)
+	if reverseDeps {
+		rev = 1
+	}
+	r1 := lib.AlpmCheckDeps(h.ptr, pkgList.Ptr(), remPkgList.Ptr(), upgradePkgList.Ptr(), rev)
 	if r1 == 0 {
 		return []DepMissing{}, nil
 	}
@@ -437,10 +409,8 @@ func (h *handle) CheckConflicts(pkgs []Package) ([]Conflict, error) {
 	if h.ptr == 0 {
 		return nil, dyerrors.ErrHandleNull
 	}
-
-	fn, err := h.registry.GetFunc("alpm_checkconflicts")
-	if err != nil {
-		return nil, err
+	if lib.AlpmCheckConflicts == nil {
+		return nil, stderrors.New("missing function: alpm_checkconflicts")
 	}
 
 	var pkgList *list.List
@@ -450,7 +420,7 @@ func (h *handle) CheckConflicts(pkgs []Package) ([]Conflict, error) {
 	}
 	defer pkgList.Free()
 
-	r1, _, _ := purego.SyscallN(fn, h.ptr, pkgList.Ptr())
+	r1 := lib.AlpmCheckConflicts(h.ptr, pkgList.Ptr())
 	if r1 == 0 {
 		return []Conflict{}, nil
 	}
@@ -471,13 +441,7 @@ func (h *handle) CheckConflicts(pkgs []Package) ([]Conflict, error) {
 
 // FindSatisfier finds a package that satisfies a dependency in a list of packages
 func FindSatisfier(pkgs []Package, depstring string) Package {
-	reg, err := lib.GetRegistry()
-	if err != nil {
-		return nil
-	}
-
-	fn, err := reg.GetFunc("alpm_find_satisfier")
-	if err != nil {
+	if lib.AlpmFindSatisfier == nil {
 		return nil
 	}
 
@@ -494,9 +458,7 @@ func FindSatisfier(pkgs []Package, depstring string) Package {
 	}
 	defer pkgList.Free()
 
-	cStr := lib.CString(depstring)
-	r1, _, _ := purego.SyscallN(fn, pkgList.Ptr(), uintptr(unsafe.Pointer(&cStr[0])))
-	runtime.KeepAlive(cStr)
+	r1 := lib.AlpmFindSatisfier(pkgList.Ptr(), depstring)
 
 	if r1 == 0 {
 		return nil
@@ -509,9 +471,7 @@ func (h *handle) FindDBSatisfier(dbs []Database, depstring string) Package {
 	if h.ptr == 0 {
 		return nil
 	}
-
-	fn, err := h.registry.GetFunc("alpm_find_dbs_satisfier")
-	if err != nil {
+	if lib.AlpmFindDBSatisfier == nil {
 		return nil
 	}
 
@@ -524,9 +484,7 @@ func (h *handle) FindDBSatisfier(dbs []Database, depstring string) Package {
 	}
 	defer dbList.Free()
 
-	cStr := lib.CString(depstring)
-	r1, _, _ := purego.SyscallN(fn, h.ptr, dbList.Ptr(), uintptr(unsafe.Pointer(&cStr[0])))
-	runtime.KeepAlive(cStr)
+	r1 := lib.AlpmFindDBSatisfier(h.ptr, dbList.Ptr(), depstring)
 
 	if r1 == 0 {
 		return nil

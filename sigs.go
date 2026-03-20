@@ -83,19 +83,27 @@ func decodeSigList(ptr uintptr) SigList {
 	return SigList{Results: results}
 }
 
-func checkPGPSignature(ptr uintptr, registry *lib.FunctionRegistry, handle *handle, funcName string) (SigList, error) {
-	fn, err := registry.GetFunc(funcName)
-	if err != nil {
-		return SigList{}, err
+func checkPGPSignature(ptr uintptr, handle *handle, funcName string) (SigList, error) {
+	var fn func(uintptr, uintptr) int32
+	switch funcName {
+	case "alpm_db_check_pgp_signature":
+		fn = lib.AlpmDBCheckPGPSignature
+	case "alpm_pkg_check_pgp_signature":
+		fn = lib.AlpmPkgCheckPGPSignature
+	default:
+		return SigList{}, stderrors.New("missing function: " + funcName)
+	}
+
+	if fn == nil {
+		return SigList{}, stderrors.New("missing function: " + funcName)
 	}
 
 	var sigList alpmSiglistT
 	sigListPtr := uintptr(unsafe.Pointer(&sigList))
 
-	result := lib.Syscall(fn, ptr, sigListPtr)
+	result := fn(ptr, sigListPtr)
 	decoded := decodeSigList(sigListPtr)
 
-	// We should clean up the siglist after use
 	cleanupErr := handle.SigListCleanup(sigListPtr)
 
 	if result != 0 {
@@ -117,12 +125,12 @@ func (h *handle) SigListCleanup(siglistPtr uintptr) error {
 	if h.ptr == 0 {
 		return ErrInvalidHandle
 	}
-
-	fn, err := h.registry.GetFunc("alpm_siglist_cleanup")
-	if err != nil {
-		return err
+	if lib.AlpmSiglistCleanup == nil {
+		return stderrors.New("missing function: alpm_siglist_cleanup")
 	}
 
-	lib.Syscall(fn, siglistPtr)
+	if lib.AlpmSiglistCleanup(siglistPtr, h.ptr) != 0 {
+		return stderrors.New("failed to clean up signature list")
+	}
 	return nil
 }

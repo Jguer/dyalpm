@@ -31,27 +31,43 @@ type Database interface {
 }
 
 type database struct {
-	ptr      uintptr
-	handle   *handle
-	registry *lib.FunctionRegistry
+	ptr    uintptr
+	handle *handle
 }
 
 func newDatabase(ptr uintptr, h *handle) *database {
-	reg, _ := lib.GetRegistry()
 	return &database{
-		ptr:      ptr,
-		handle:   h,
-		registry: reg,
+		ptr:    ptr,
+		handle: h,
 	}
 }
 
 func (d *database) getList(funcName string) (*list.List, error) {
-	fn, err := d.registry.GetFunc(funcName)
-	if err != nil {
-		return nil, err
+	var listPtr uintptr
+	switch funcName {
+	case "alpm_db_get_pkgcache":
+		if lib.AlpmDBGetPkgcache == nil {
+			return nil, stderrors.New("missing function: alpm_db_get_pkgcache")
+		}
+		listPtr = lib.AlpmDBGetPkgcache(d.ptr)
+	case "alpm_db_get_groupcache":
+		if lib.AlpmDBGetGroupcache == nil {
+			return nil, stderrors.New("missing function: alpm_db_get_groupcache")
+		}
+		listPtr = lib.AlpmDBGetGroupcache(d.ptr)
+	case "alpm_db_get_servers":
+		if lib.AlpmDBGetServers == nil {
+			return nil, stderrors.New("missing function: alpm_db_get_servers")
+		}
+		listPtr = lib.AlpmDBGetServers(d.ptr)
+	case "alpm_db_get_cache_servers":
+		if lib.AlpmDBGetCacheServers == nil {
+			return nil, stderrors.New("missing function: alpm_db_get_cache_servers")
+		}
+		listPtr = lib.AlpmDBGetCacheServers(d.ptr)
+	default:
+		return nil, stderrors.New("missing function: " + funcName)
 	}
-
-	listPtr := lib.Syscall(fn, d.ptr)
 	if listPtr == 0 {
 		return nil, nil
 	}
@@ -78,14 +94,10 @@ func (d *database) GetName() string {
 	if d.ptr == 0 {
 		return ""
 	}
-
-	getNameFn := cachedFunc("alpm_db_get_name")
-	if getNameFn == 0 {
+	if lib.AlpmDBGetName == nil {
 		return ""
 	}
-
-	result := lib.Syscall(getNameFn, d.ptr)
-	return lib.PtrToString(result)
+	return lib.PtrToString(lib.AlpmDBGetName(d.ptr))
 }
 
 func (d *database) GetHandle() Handle {
@@ -96,16 +108,11 @@ func (d *database) GetPkg(name string) (Package, error) {
 	if d.ptr == 0 {
 		return nil, ErrInvalidDatabase
 	}
-
-	getPkgFn := cachedFunc("alpm_db_get_pkg")
-	if getPkgFn == 0 {
+	if lib.AlpmDBGetPkg == nil {
 		return nil, stderrors.New("missing function: alpm_db_get_pkg")
 	}
 
-	nameBytes := lib.CString(name)
-	namePtr := uintptr(unsafe.Pointer(&nameBytes[0]))
-	pkgPtr := lib.Syscall(getPkgFn, d.ptr, namePtr)
-	runtime.KeepAlive(nameBytes)
+	pkgPtr := lib.AlpmDBGetPkg(d.ptr, name)
 	if pkgPtr == 0 {
 		return nil, ErrPackageNotFound
 	}
@@ -151,12 +158,11 @@ func (d *database) PkgCache() PackageIterator {
 		return PackageIterator{}
 	}
 
-	getPkgCacheFn := cachedFunc("alpm_db_get_pkgcache")
-	if getPkgCacheFn == 0 {
+	if lib.AlpmDBGetPkgcache == nil {
 		return PackageIterator{}
 	}
 
-	listPtr := lib.Syscall(getPkgCacheFn, d.ptr)
+	listPtr := lib.AlpmDBGetPkgcache(d.ptr)
 	if listPtr == 0 {
 		return PackageIterator{}
 	}
@@ -173,8 +179,7 @@ func (d *database) Search(needles []string) PackageIterator {
 		return PackageIterator{}
 	}
 
-	searchFn := cachedFunc("alpm_db_search")
-	if searchFn == 0 {
+	if lib.AlpmDBSearch == nil {
 		return PackageIterator{}
 	}
 
@@ -191,10 +196,8 @@ func (d *database) Search(needles []string) PackageIterator {
 		return PackageIterator{}
 	}
 
-	// alpm_db_search signature: int alpm_db_search(db, needles, &result)
-	// Returns error code and writes result list to output parameter
 	var resultListPtr uintptr
-	ret := lib.Syscall(searchFn, d.ptr, alpmList.Ptr(), uintptr(unsafe.Pointer(&resultListPtr)))
+	ret := int(lib.AlpmDBSearch(d.ptr, alpmList.Ptr(), &resultListPtr))
 	runtime.KeepAlive(cStrings)
 	runtime.KeepAlive(alpmList)
 
@@ -210,16 +213,11 @@ func (d *database) GetGroup(name string) (Group, error) {
 	if d.ptr == 0 {
 		return nil, ErrInvalidDatabase
 	}
-
-	getGroupFn, err := d.registry.GetFunc("alpm_db_get_group")
-	if err != nil {
-		return nil, err
+	if lib.AlpmDBGetGroup == nil {
+		return nil, stderrors.New("missing function: alpm_db_get_group")
 	}
 
-	nameBytes := lib.CString(name)
-	namePtr := uintptr(unsafe.Pointer(&nameBytes[0]))
-	groupPtr := lib.Syscall(getGroupFn, d.ptr, namePtr)
-	runtime.KeepAlive(nameBytes)
+	groupPtr := lib.AlpmDBGetGroup(d.ptr, name)
 	if groupPtr == 0 {
 		return nil, ErrGroupNotFound
 	}
@@ -249,9 +247,8 @@ func (d *database) Update(force bool) error {
 		return ErrInvalidDatabase
 	}
 
-	updateFn, err := d.registry.GetFunc("alpm_db_update")
-	if err != nil {
-		return err
+	if lib.AlpmDBUpdate == nil {
+		return stderrors.New("missing function: alpm_db_update")
 	}
 
 	// alpm_db_update expects a list of databases
@@ -261,8 +258,11 @@ func (d *database) Update(force bool) error {
 	}
 	defer dbList.Free()
 
-	forceInt := lib.BoolToInt(force)
-	result := lib.Syscall(updateFn, d.handle.ptr, dbList.Ptr(), forceInt)
+	forceInt := int32(0)
+	if force {
+		forceInt = 1
+	}
+	result := lib.AlpmDBUpdate(d.handle.ptr, dbList.Ptr(), forceInt)
 	if result != 0 {
 		return ErrDatabaseUpdateFailed
 	}
@@ -275,12 +275,11 @@ func (d *database) Unregister() error {
 		return ErrInvalidDatabase
 	}
 
-	unregisterFn, err := d.registry.GetFunc("alpm_db_unregister")
-	if err != nil {
-		return err
+	if lib.AlpmDBUnregister == nil {
+		return stderrors.New("missing function: alpm_db_unregister")
 	}
 
-	result := lib.Syscall(unregisterFn, d.ptr)
+	result := lib.AlpmDBUnregister(d.ptr)
 	if result != 0 {
 		return ErrDatabaseUnregisterFailed
 	}
@@ -302,9 +301,18 @@ func (d *database) setServers(funcName string, servers []string) error {
 		return ErrInvalidDatabase
 	}
 
-	setServersFn, err := d.registry.GetFunc(funcName)
-	if err != nil {
-		return err
+	var setServersFn func(uintptr, uintptr) int32
+	switch funcName {
+	case "alpm_db_set_servers":
+		setServersFn = lib.AlpmDBSetServers
+	case "alpm_db_set_cache_servers":
+		setServersFn = lib.AlpmDBSetCacheServers
+	default:
+		return stderrors.New("missing function: " + funcName)
+	}
+
+	if setServersFn == nil {
+		return stderrors.New("missing function: " + funcName)
 	}
 
 	var alpmList *list.List
@@ -316,7 +324,7 @@ func (d *database) setServers(funcName string, servers []string) error {
 		alpmList = list.Add(alpmList, uintptr(unsafe.Pointer(&cs[0])))
 	}
 
-	result := lib.Syscall(setServersFn, d.ptr, alpmList.Ptr())
+	result := setServersFn(d.ptr, alpmList.Ptr())
 
 	// Keep strings alive during the call
 	runtime.KeepAlive(cStrings)
@@ -334,14 +342,11 @@ func (d *database) AddServer(url string) error {
 		return ErrInvalidDatabase
 	}
 
-	addServerFn, err := d.registry.GetFunc("alpm_db_add_server")
-	if err != nil {
-		return err
+	if lib.AlpmDBAddServer == nil {
+		return stderrors.New("missing function: alpm_db_add_server")
 	}
 
-	urlBytes := lib.CString(url)
-	result := lib.Syscall(addServerFn, d.ptr, uintptr(unsafe.Pointer(&urlBytes[0])))
-	runtime.KeepAlive(urlBytes)
+	result := lib.AlpmDBAddServer(d.ptr, url)
 
 	if result != 0 {
 		return ErrDatabaseUpdateFailed
@@ -355,14 +360,11 @@ func (d *database) RemoveServer(url string) error {
 		return ErrInvalidDatabase
 	}
 
-	removeServerFn, err := d.registry.GetFunc("alpm_db_remove_server")
-	if err != nil {
-		return err
+	if lib.AlpmDBRemoveServer == nil {
+		return stderrors.New("missing function: alpm_db_remove_server")
 	}
 
-	urlBytes := lib.CString(url)
-	result := lib.Syscall(removeServerFn, d.ptr, uintptr(unsafe.Pointer(&urlBytes[0])))
-	runtime.KeepAlive(urlBytes)
+	result := lib.AlpmDBRemoveServer(d.ptr, url)
 
 	if result != 0 {
 		return ErrDatabaseUpdateFailed
@@ -384,14 +386,11 @@ func (d *database) AddCacheServer(url string) error {
 		return ErrInvalidDatabase
 	}
 
-	addCacheServerFn, err := d.registry.GetFunc("alpm_db_add_cache_server")
-	if err != nil {
-		return err
+	if lib.AlpmDBAddCacheServer == nil {
+		return stderrors.New("missing function: alpm_db_add_cache_server")
 	}
 
-	urlBytes := lib.CString(url)
-	result := lib.Syscall(addCacheServerFn, d.ptr, uintptr(unsafe.Pointer(&urlBytes[0])))
-	runtime.KeepAlive(urlBytes)
+	result := lib.AlpmDBAddCacheServer(d.ptr, url)
 
 	if result != 0 {
 		return ErrDatabaseUpdateFailed
@@ -405,14 +404,11 @@ func (d *database) RemoveCacheServer(url string) error {
 		return ErrInvalidDatabase
 	}
 
-	removeCacheServerFn, err := d.registry.GetFunc("alpm_db_remove_cache_server")
-	if err != nil {
-		return err
+	if lib.AlpmDBRemoveCacheServer == nil {
+		return stderrors.New("missing function: alpm_db_remove_cache_server")
 	}
 
-	urlBytes := lib.CString(url)
-	result := lib.Syscall(removeCacheServerFn, d.ptr, uintptr(unsafe.Pointer(&urlBytes[0])))
-	runtime.KeepAlive(urlBytes)
+	result := lib.AlpmDBRemoveCacheServer(d.ptr, url)
 
 	if result != 0 {
 		return ErrDatabaseUpdateFailed
@@ -426,12 +422,11 @@ func (d *database) SetUsage(usage int) error {
 		return ErrInvalidDatabase
 	}
 
-	setUsageFn, err := d.registry.GetFunc("alpm_db_set_usage")
-	if err != nil {
-		return err
+	if lib.AlpmDBSetUsage == nil {
+		return stderrors.New("missing function: alpm_db_set_usage")
 	}
 
-	result := lib.Syscall(setUsageFn, d.ptr, uintptr(usage))
+	result := lib.AlpmDBSetUsage(d.ptr, int32(usage))
 	if result != 0 {
 		return ErrDatabaseUpdateFailed
 	}
@@ -444,18 +439,17 @@ func (d *database) GetUsage() (int, error) {
 		return 0, ErrInvalidDatabase
 	}
 
-	getUsageFn, err := d.registry.GetFunc("alpm_db_get_usage")
-	if err != nil {
-		return 0, err
+	if lib.AlpmDBGetUsage == nil {
+		return 0, stderrors.New("missing function: alpm_db_get_usage")
 	}
 
-	var usage int
-	result := lib.Syscall(getUsageFn, d.ptr, uintptr(unsafe.Pointer(&usage)))
+	var usagePtr int32
+	result := lib.AlpmDBGetUsage(d.ptr, &usagePtr)
 	if result != 0 {
 		return 0, ErrDatabaseUpdateFailed
 	}
 
-	return usage, nil
+	return int(usagePtr), nil
 }
 
 func (d *database) IsValid() bool {
@@ -463,12 +457,11 @@ func (d *database) IsValid() bool {
 		return false
 	}
 
-	getValidFn, err := d.registry.GetFunc("alpm_db_get_valid")
-	if err != nil {
+	if lib.AlpmDBGetValid == nil {
 		return false
 	}
 
-	result := lib.Syscall(getValidFn, d.ptr)
+	result := lib.AlpmDBGetValid(d.ptr)
 	return result == 0
 }
 
@@ -477,12 +470,11 @@ func (d *database) GetSigLevel() int {
 		return 0
 	}
 
-	getSigLevelFn, err := d.registry.GetFunc("alpm_db_get_siglevel")
-	if err != nil {
+	if lib.AlpmDBGetSiglevel == nil {
 		return 0
 	}
 
-	result := lib.Syscall(getSigLevelFn, d.ptr)
+	result := lib.AlpmDBGetSiglevel(d.ptr)
 	return int(result)
 }
 
@@ -491,17 +483,15 @@ func (d *database) GetNativeHandle() Handle {
 		return nil
 	}
 
-	fn, err := d.registry.GetFunc("alpm_db_get_handle")
-	if err != nil {
+	if lib.AlpmDBGetHandle == nil {
 		return nil
 	}
 
-	result := lib.Syscall(fn, d.ptr)
+	result := lib.AlpmDBGetHandle(d.ptr)
 	if result == 0 {
 		return nil
 	}
 
-	// This should match d.handle.ptr if everything is correct
 	return d.handle
 }
 
@@ -510,7 +500,7 @@ func (d *database) CheckPGPSignature() (SigList, error) {
 		return SigList{}, ErrInvalidDatabase
 	}
 
-	return checkPGPSignature(d.ptr, d.registry, d.handle, "alpm_db_check_pgp_signature")
+	return checkPGPSignature(d.ptr, d.handle, "alpm_db_check_pgp_signature")
 }
 
 // Group represents a package group
@@ -520,17 +510,14 @@ type Group interface {
 }
 
 type group struct {
-	ptr      uintptr
-	handle   *handle
-	registry *lib.FunctionRegistry
+	ptr    uintptr
+	handle *handle
 }
 
 func newGroup(ptr uintptr, h *handle) *group {
-	reg, _ := lib.GetRegistry()
 	return &group{
-		ptr:      ptr,
-		handle:   h,
-		registry: reg,
+		ptr:    ptr,
+		handle: h,
 	}
 }
 

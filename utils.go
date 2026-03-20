@@ -5,8 +5,6 @@ import (
 	"runtime"
 	"unsafe"
 
-	"github.com/ebitengine/purego"
-
 	"github.com/Jguer/dyalpm/internal/lib"
 	"github.com/Jguer/dyalpm/internal/list"
 )
@@ -23,19 +21,21 @@ func collectList[T any](alpmList *list.List, build func(uintptr) T) []T {
 }
 
 func computeFileSum(funcName, filename string) (string, error) {
-	reg, err := lib.GetRegistry()
-	if err != nil {
-		return "", err
+	var r1 uintptr
+	switch funcName {
+	case "alpm_compute_md5sum":
+		if lib.AlpmComputeMd5sum == nil {
+			return "", ErrInvalidPackage
+		}
+		r1 = lib.AlpmComputeMd5sum(filename)
+	case "alpm_compute_sha256sum":
+		if lib.AlpmComputeSha256sum == nil {
+			return "", ErrInvalidPackage
+		}
+		r1 = lib.AlpmComputeSha256sum(filename)
+	default:
+		return "", ErrInvalidPackage
 	}
-
-	fn, err := reg.GetFunc(funcName)
-	if err != nil {
-		return "", err
-	}
-
-	cStr := lib.CString(filename)
-	r1, _, _ := purego.SyscallN(fn, uintptr(unsafe.Pointer(&cStr[0])))
-	runtime.KeepAlive(cStr)
 
 	if r1 == 0 {
 		return "", ErrInvalidPackage
@@ -60,10 +60,8 @@ func (h *handle) FindGroupPkgs(dbs []Database, name string) ([]Package, error) {
 	if h.ptr == 0 {
 		return nil, ErrInvalidHandle
 	}
-
-	fn, err := h.registry.GetFunc("alpm_find_group_pkgs")
-	if err != nil {
-		return nil, err
+	if lib.AlpmFindGroupPkgs == nil {
+		return nil, stderrors.New("missing function: alpm_find_group_pkgs")
 	}
 
 	var dbList *list.List
@@ -75,9 +73,7 @@ func (h *handle) FindGroupPkgs(dbs []Database, name string) ([]Package, error) {
 	}
 	defer dbList.Free()
 
-	cName := lib.CString(name)
-	r1, _, _ := purego.SyscallN(fn, dbList.Ptr(), uintptr(unsafe.Pointer(&cName[0])))
-	runtime.KeepAlive(cName)
+	r1 := lib.AlpmFindGroupPkgs(dbList.Ptr(), name)
 
 	if r1 == 0 {
 		return []Package{}, nil
@@ -101,31 +97,18 @@ func (h *handle) ExtractKeyID(identifier string, sig []byte) ([]string, error) {
 	if h.ptr == 0 {
 		return nil, ErrInvalidHandle
 	}
-
-	fn, err := h.registry.GetFunc("alpm_extract_keyid")
-	if err != nil {
-		return nil, err
+	if lib.AlpmExtractKeyID == nil {
+		return nil, stderrors.New("missing function: alpm_extract_keyid")
 	}
 
-	cIdentifier := lib.CString(identifier)
 	var keysListPtr uintptr
-
-	// alpm_extract_keyid(handle, identifier, sig, len, &keys)
 	var sigPtr uintptr
 	if len(sig) > 0 {
 		sigPtr = uintptr(unsafe.Pointer(&sig[0]))
 	}
 
-	r1, _, _ := purego.SyscallN(
-		fn,
-		h.ptr,
-		uintptr(unsafe.Pointer(&cIdentifier[0])),
-		sigPtr,
-		uintptr(len(sig)),
-		uintptr(unsafe.Pointer(&keysListPtr)),
-	)
+	r1 := lib.AlpmExtractKeyID(h.ptr, identifier, sigPtr, int32(len(sig)), &keysListPtr)
 
-	runtime.KeepAlive(cIdentifier)
 	runtime.KeepAlive(sig)
 
 	if r1 != 0 {

@@ -1,82 +1,8 @@
 package lib
 
 import (
-	"errors"
-	"sync"
 	"unsafe"
-
-	"github.com/ebitengine/purego"
 )
-
-// FunctionRegistry manages lazy loading of ALPM functions
-type FunctionRegistry struct {
-	lib   uintptr
-	mu    sync.RWMutex
-	funcs map[string]uintptr
-}
-
-var (
-	registryOnce sync.Once
-	registry     *FunctionRegistry
-	registryErr  error
-)
-
-// GetRegistry returns the global function registry
-func GetRegistry() (*FunctionRegistry, error) {
-	registryOnce.Do(func() {
-		lib, loadErr := getLibrary()
-		if loadErr != nil {
-			registryErr = loadErr
-			return
-		}
-		registry = &FunctionRegistry{
-			lib:   lib,
-			funcs: make(map[string]uintptr),
-		}
-	})
-	return registry, registryErr
-}
-
-// GetFunc lazily loads and returns a function pointer
-func (r *FunctionRegistry) GetFunc(name string) (uintptr, error) {
-	r.mu.RLock()
-	if fn, ok := r.funcs[name]; ok {
-		r.mu.RUnlock()
-		return fn, nil
-	}
-	r.mu.RUnlock()
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	// Double check after acquiring write lock
-	if fn, ok := r.funcs[name]; ok {
-		return fn, nil
-	}
-
-	fnPtr, err := purego.Dlsym(r.lib, name)
-	if err != nil {
-		return 0, err
-	}
-
-	r.funcs[name] = fnPtr
-	return fnPtr, nil
-}
-
-// CallFunc calls a function with the given arguments using purego.SyscallN
-func (r *FunctionRegistry) CallFunc(name string, args ...uintptr) (uintptr, error) {
-	fn, err := r.GetFunc(name)
-	if err != nil {
-		return 0, err
-	}
-	r1, _, errno := purego.SyscallN(fn, args...)
-	if errno != 0 {
-		return 0, errors.New("syscall failed")
-	}
-	return r1, nil
-}
-
-// Helper functions for common conversions
 
 // CString converts a Go string to a null-terminated byte slice.
 // The caller must keep the slice alive during the C call and use &buf[0] as the pointer.

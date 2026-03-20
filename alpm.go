@@ -1,37 +1,31 @@
 package dyalpm
 
-import "github.com/Jguer/dyalpm/internal/lib"
+import (
+	stderrors "errors"
+
+	"github.com/Jguer/dyalpm/internal/lib"
+)
 
 // Version returns the library version string
 func Version() string {
-	reg, err := lib.GetRegistry()
-	if err != nil {
+	if err := lib.EnsureAlpmLoaded(); err != nil {
 		return ""
 	}
-
-	versionFn, err := reg.GetFunc("alpm_version")
-	if err != nil {
+	if lib.AlpmVersion == nil {
 		return ""
 	}
-
-	ptr := lib.Syscall(versionFn)
-	return lib.PtrToString(ptr)
+	return lib.PtrToString(lib.AlpmVersion())
 }
 
 // Capabilities returns the library capabilities
 func Capabilities() (CapabilitiesMask, error) {
-	reg, err := lib.GetRegistry()
-	if err != nil {
+	if err := lib.EnsureAlpmLoaded(); err != nil {
 		return 0, err
 	}
-
-	capsFn, err := reg.GetFunc("alpm_capabilities")
-	if err != nil {
-		return 0, err
+	if lib.AlpmCapabilities == nil {
+		return 0, stderrors.New("missing function: alpm_capabilities")
 	}
-
-	caps := lib.Syscall(capsFn)
-	return CapabilitiesMask(caps), nil
+	return CapabilitiesMask(lib.AlpmCapabilities()), nil
 }
 
 // CapabilitiesMask represents the library capabilities bitmask

@@ -3,11 +3,8 @@ package dyalpm
 import (
 	stderrors "errors"
 	"io"
-	"runtime"
 	"time"
 	"unsafe"
-
-	"github.com/ebitengine/purego"
 
 	"github.com/Jguer/dyalpm/internal/lib"
 	"github.com/Jguer/dyalpm/internal/list"
@@ -48,17 +45,14 @@ const (
 
 //nolint:revive // legacy name kept for compatibility
 type package_ struct {
-	ptr      uintptr
-	handle   *handle
-	registry *lib.FunctionRegistry
+	ptr    uintptr
+	handle *handle
 }
 
 func newPackage(ptr uintptr, h *handle) *package_ {
-	reg, _ := lib.GetRegistry()
 	return &package_{
-		ptr:      ptr,
-		handle:   h,
-		registry: reg,
+		ptr:    ptr,
+		handle: h,
 	}
 }
 
@@ -66,97 +60,70 @@ func (p *package_) Name() string {
 	if p.ptr == 0 {
 		return ""
 	}
-
-	getNameFn := cachedFunc("alpm_pkg_get_name")
-	if getNameFn == 0 {
+	if lib.AlpmPkgGetName == nil {
 		return ""
 	}
-
-	result := lib.Syscall(getNameFn, p.ptr)
-	return lib.PtrToString(result)
+	return lib.PtrToString(lib.AlpmPkgGetName(p.ptr))
 }
 
 func (p *package_) Version() string {
 	if p.ptr == 0 {
 		return ""
 	}
-
-	getVersionFn := cachedFunc("alpm_pkg_get_version")
-	if getVersionFn == 0 {
+	if lib.AlpmPkgGetVersion == nil {
 		return ""
 	}
-
-	result := lib.Syscall(getVersionFn, p.ptr)
-	return lib.PtrToString(result)
+	return lib.PtrToString(lib.AlpmPkgGetVersion(p.ptr))
 }
 
 func (p *package_) Description() string {
 	if p.ptr == 0 {
 		return ""
 	}
-
-	getDescFn := cachedFunc("alpm_pkg_get_desc")
-	if getDescFn == 0 {
+	if lib.AlpmPkgGetDesc == nil {
 		return ""
 	}
-
-	result := lib.Syscall(getDescFn, p.ptr)
-	return lib.PtrToString(result)
+	return lib.PtrToString(lib.AlpmPkgGetDesc(p.ptr))
 }
 
 func (p *package_) Architecture() string {
 	if p.ptr == 0 {
 		return ""
 	}
-
-	getArchFn := cachedFunc("alpm_pkg_get_arch")
-	if getArchFn == 0 {
+	if lib.AlpmPkgGetArch == nil {
 		return ""
 	}
-
-	result := lib.Syscall(getArchFn, p.ptr)
-	return lib.PtrToString(result)
+	return lib.PtrToString(lib.AlpmPkgGetArch(p.ptr))
 }
 
 func (p *package_) Size() int64 {
 	if p.ptr == 0 {
 		return 0
 	}
-
-	getSizeFn := cachedFunc("alpm_pkg_get_size")
-	if getSizeFn == 0 {
+	if lib.AlpmPkgGetSize == nil {
 		return 0
 	}
-
-	result := lib.Syscall(getSizeFn, p.ptr)
-	return int64(result)
+	return int64(lib.AlpmPkgGetSize(p.ptr))
 }
 
 func (p *package_) ISize() int64 {
 	if p.ptr == 0 {
 		return 0
 	}
-
-	getISizeFn := cachedFunc("alpm_pkg_get_isize")
-	if getISizeFn == 0 {
+	if lib.AlpmPkgGetISize == nil {
 		return 0
 	}
-
-	result := lib.Syscall(getISizeFn, p.ptr)
-	return int64(result)
+	return int64(lib.AlpmPkgGetISize(p.ptr))
 }
 
 func (p *package_) DB() Database {
 	if p.ptr == 0 {
 		return nil
 	}
-
-	getDBFn := cachedFunc("alpm_pkg_get_db")
-	if getDBFn == 0 {
+	if lib.AlpmPkgGetDB == nil {
 		return nil
 	}
-
-	dbPtr := lib.Syscall(getDBFn, p.ptr)
+	dbPtr := lib.AlpmPkgGetDB(p.ptr)
 	if dbPtr == 0 {
 		return nil
 	}
@@ -183,13 +150,32 @@ func (p *package_) getDependencyList(funcName string) ([]Dependency, error) {
 	if p.ptr == 0 {
 		return nil, ErrInvalidPackage
 	}
-
-	getFn := cachedFunc(funcName)
-	if getFn == 0 {
+	var getFn func(uintptr) uintptr
+	switch funcName {
+	case "alpm_pkg_get_depends":
+		getFn = lib.AlpmPkgGetDepends
+	case "alpm_pkg_get_conflicts":
+		getFn = lib.AlpmPkgGetConflicts
+	case "alpm_pkg_get_provides":
+		getFn = lib.AlpmPkgGetProvides
+	case "alpm_pkg_get_optdepends":
+		getFn = lib.AlpmPkgGetOptdepends
+	case "alpm_pkg_get_replaces":
+		getFn = lib.AlpmPkgGetReplaces
+	case "alpm_pkg_get_groups":
+		getFn = lib.AlpmPkgGetGroups
+	case "alpm_pkg_get_licenses":
+		getFn = lib.AlpmPkgGetLicenses
+	case "alpm_pkg_get_files":
+		getFn = lib.AlpmPkgGetFiles
+	default:
 		return nil, stderrors.New("missing function: " + funcName)
 	}
+	if getFn == nil {
+		return nil, nil
+	}
 
-	listPtr := lib.Syscall(getFn, p.ptr)
+	listPtr := getFn(p.ptr)
 	if listPtr == 0 {
 		return []Dependency{}, nil
 	}
@@ -215,14 +201,7 @@ func PkgFind(pkgs []Package, name string) Package {
 	if len(pkgs) == 0 {
 		return nil
 	}
-
-	reg, err := lib.GetRegistry()
-	if err != nil {
-		return nil
-	}
-
-	fn, err := reg.GetFunc("alpm_pkg_find")
-	if err != nil {
+	if lib.AlpmPkgFind == nil {
 		return nil
 	}
 
@@ -235,9 +214,7 @@ func PkgFind(pkgs []Package, name string) Package {
 	}
 	defer alpmList.Free()
 
-	nameBytes := lib.CString(name)
-	pkgPtr, _, _ := purego.SyscallN(fn, alpmList.Ptr(), uintptr(unsafe.Pointer(&nameBytes[0])))
-	runtime.KeepAlive(nameBytes)
+	pkgPtr := lib.AlpmPkgFind(alpmList.Ptr(), name)
 
 	if pkgPtr == 0 {
 		return nil
@@ -296,12 +273,27 @@ func (p *package_) getStringListWithFree(funcName string, freeList bool) ([]stri
 		return nil, ErrInvalidPackage
 	}
 
-	fn := cachedFunc(funcName)
-	if fn == 0 {
+	var getter func(uintptr) uintptr
+	switch funcName {
+	case "alpm_pkg_get_groups":
+		getter = lib.AlpmPkgGetGroups
+	case "alpm_pkg_get_licenses":
+		getter = lib.AlpmPkgGetLicenses
+	case "alpm_pkg_get_xdata":
+		getter = lib.AlpmPkgGetXdata
+	case "alpm_pkg_compute_requiredby":
+		getter = lib.AlpmPkgComputeRequiredBy
+	case "alpm_pkg_compute_optionalfor":
+		getter = lib.AlpmPkgComputeOptionalFor
+	default:
 		return nil, stderrors.New("missing function: " + funcName)
 	}
 
-	r1, _, _ := purego.SyscallN(fn, p.ptr)
+	if getter == nil {
+		return nil, stderrors.New("missing function: " + funcName)
+	}
+
+	r1 := getter(p.ptr)
 	if r1 == 0 {
 		return []string{}, nil
 	}
@@ -363,12 +355,11 @@ func (p *package_) Backup() []Backup {
 		return []Backup{}
 	}
 
-	fn, err := p.registry.GetFunc("alpm_pkg_get_backup")
-	if err != nil {
+	if lib.AlpmPkgGetBackup == nil {
 		return []Backup{}
 	}
 
-	r1, _, _ := purego.SyscallN(fn, p.ptr)
+	r1 := lib.AlpmPkgGetBackup(p.ptr)
 	if r1 == 0 {
 		return []Backup{}
 	}
@@ -411,13 +402,12 @@ func (p *package_) Files() []File {
 		return []File{}
 	}
 
-	fn, err := p.registry.GetFunc("alpm_pkg_get_files")
-	if err != nil {
+	if lib.AlpmPkgGetFiles == nil {
 		return []File{}
 	}
 
 	// alpm_filelist_t* returned
-	r1, _, _ := purego.SyscallN(fn, p.ptr)
+	r1 := lib.AlpmPkgGetFiles(p.ptr)
 	if r1 == 0 {
 		return []File{}
 	}
@@ -492,12 +482,11 @@ func (p *package_) Origin() PkgFrom {
 		return PkgFromFile // Default or error?
 	}
 
-	fn, err := p.registry.GetFunc("alpm_pkg_get_origin")
-	if err != nil {
+	if lib.AlpmPkgGetOrigin == nil {
 		return PkgFromFile
 	}
 
-	r1, _, _ := purego.SyscallN(fn, p.ptr)
+	r1 := lib.AlpmPkgGetOrigin(p.ptr)
 	return PkgFrom(r1)
 }
 
@@ -506,13 +495,10 @@ func (p *package_) BuildDate() time.Time {
 		return time.Time{}
 	}
 
-	fn := cachedFunc("alpm_pkg_get_builddate")
-	if fn == 0 {
+	if lib.AlpmPkgGetBuildDate == nil {
 		return time.Time{}
 	}
-
-	r1, _, _ := purego.SyscallN(fn, p.ptr)
-	return toTime(int64(r1))
+	return toTime(int64(lib.AlpmPkgGetBuildDate(p.ptr)))
 }
 
 func (p *package_) InstallDate() time.Time {
@@ -520,13 +506,10 @@ func (p *package_) InstallDate() time.Time {
 		return time.Time{}
 	}
 
-	fn, err := p.registry.GetFunc("alpm_pkg_get_installdate")
-	if err != nil {
+	if lib.AlpmPkgGetInstallDate == nil {
 		return time.Time{}
 	}
-
-	r1, _, _ := purego.SyscallN(fn, p.ptr)
-	return toTime(int64(r1))
+	return toTime(int64(lib.AlpmPkgGetInstallDate(p.ptr)))
 }
 
 func (p *package_) Reason() PkgReason {
@@ -534,12 +517,11 @@ func (p *package_) Reason() PkgReason {
 		return PkgReasonExplicit
 	}
 
-	fn := cachedFunc("alpm_pkg_get_reason")
-	if fn == 0 {
+	if lib.AlpmPkgGetReason == nil {
 		return PkgReasonExplicit
 	}
 
-	r1, _, _ := purego.SyscallN(fn, p.ptr)
+	r1 := lib.AlpmPkgGetReason(p.ptr)
 	return PkgReason(r1)
 }
 
@@ -548,13 +530,11 @@ func (p *package_) HasScriptlet() bool {
 		return false
 	}
 
-	fn, err := p.registry.GetFunc("alpm_pkg_has_scriptlet")
-	if err != nil {
+	if lib.AlpmPkgHasScriptlet == nil {
 		return false
 	}
 
-	r1, _, _ := purego.SyscallN(fn, p.ptr)
-	return r1 != 0
+	return lib.AlpmPkgHasScriptlet(p.ptr) != 0
 }
 
 func (p *package_) DownloadSize() int64 {
@@ -562,13 +542,11 @@ func (p *package_) DownloadSize() int64 {
 		return 0
 	}
 
-	fn, err := p.registry.GetFunc("alpm_pkg_download_size")
-	if err != nil {
+	if lib.AlpmPkgDownloadSize == nil {
 		return 0
 	}
 
-	r1, _, _ := purego.SyscallN(fn, p.ptr)
-	return int64(r1)
+	return int64(lib.AlpmPkgDownloadSize(p.ptr))
 }
 
 func (p *package_) Free() error {
@@ -581,13 +559,11 @@ func (p *package_) Free() error {
 		return nil
 	}
 
-	fn, err := p.registry.GetFunc("alpm_pkg_free")
-	if err != nil {
-		return err
+	if lib.AlpmPkgFree == nil {
+		return stderrors.New("missing function: alpm_pkg_free")
 	}
 
-	r1, _, _ := purego.SyscallN(fn, p.ptr)
-	if r1 != 0 {
+	if lib.AlpmPkgFree(p.ptr) != 0 {
 		return ErrPackageFreeFailed
 	}
 
@@ -608,13 +584,11 @@ func (p *package_) ShouldIgnore() bool {
 		return false
 	}
 
-	fn := cachedFunc("alpm_pkg_should_ignore")
-	if fn == 0 {
+	if lib.AlpmPkgShouldIgnore == nil {
 		return false
 	}
 
-	r1, _, _ := purego.SyscallN(fn, p.handle.ptr, p.ptr)
-	return r1 != 0
+	return lib.AlpmPkgShouldIgnore(p.handle.ptr, p.ptr) != 0
 }
 
 func (p *package_) CheckMD5Sum() error {
@@ -622,13 +596,11 @@ func (p *package_) CheckMD5Sum() error {
 		return ErrInvalidPackage
 	}
 
-	fn, err := p.registry.GetFunc("alpm_pkg_checkmd5sum")
-	if err != nil {
-		return err
+	if lib.AlpmPkgCheckmd5sum == nil {
+		return stderrors.New("missing function: alpm_pkg_checkmd5sum")
 	}
 
-	r1, _, _ := purego.SyscallN(fn, p.ptr)
-	if r1 != 0 {
+	if lib.AlpmPkgCheckmd5sum(p.ptr) != 0 {
 		return stderrors.New("MD5 sum mismatch")
 	}
 
@@ -640,13 +612,11 @@ func (p *package_) NativeHandle() Handle {
 		return nil
 	}
 
-	fn, err := p.registry.GetFunc("alpm_pkg_get_handle")
-	if err != nil {
+	if lib.AlpmPkgGetHandle == nil {
 		return nil
 	}
 
-	result := lib.Syscall(fn, p.ptr)
-	if result == 0 {
+	if lib.AlpmPkgGetHandle(p.ptr) == 0 {
 		return nil
 	}
 
@@ -658,7 +628,7 @@ func (p *package_) CheckPGPSignature() (SigList, error) {
 		return SigList{}, ErrInvalidPackage
 	}
 
-	return checkPGPSignature(p.ptr, p.registry, p.handle, "alpm_pkg_check_pgp_signature")
+	return checkPGPSignature(p.ptr, p.handle, "alpm_pkg_check_pgp_signature")
 }
 
 func (p *package_) Sig() ([]byte, error) {
@@ -666,16 +636,15 @@ func (p *package_) Sig() ([]byte, error) {
 		return nil, ErrInvalidPackage
 	}
 
-	fn, err := p.registry.GetFunc("alpm_pkg_get_sig")
-	if err != nil {
-		return nil, err
+	if lib.AlpmPkgGetSig == nil {
+		return nil, stderrors.New("missing function: alpm_pkg_get_sig")
 	}
 
 	// alpm_pkg_get_sig signature: int alpm_pkg_get_sig(pkg, &sig, &sig_len)
 	// Returns error code and writes signature bytes to output parameters
 	var sigPtr uintptr
 	var sigLen uintptr
-	result := lib.Syscall(fn, p.ptr, uintptr(unsafe.Pointer(&sigPtr)), uintptr(unsafe.Pointer(&sigLen)))
+	result := lib.AlpmPkgGetSig(p.ptr, &sigPtr, &sigLen)
 	if result != 0 || sigPtr == 0 || sigLen == 0 {
 		return nil, nil // No signature or error
 	}
@@ -696,12 +665,11 @@ func (p *package_) Base64Sig() string {
 		return ""
 	}
 
-	fn, err := p.registry.GetFunc("alpm_pkg_get_base64_sig")
-	if err != nil {
+	if lib.AlpmPkgGetBase64Sig == nil {
 		return ""
 	}
 
-	result := lib.Syscall(fn, p.ptr)
+	result := lib.AlpmPkgGetBase64Sig(p.ptr)
 	return lib.PtrToString(result)
 }
 
@@ -710,12 +678,11 @@ func (p *package_) PkgValidation() PkgValidation {
 		return PkgValidationUnknown
 	}
 
-	fn, err := p.registry.GetFunc("alpm_pkg_get_validation")
-	if err != nil {
+	if lib.AlpmPkgGetValidation == nil {
 		return PkgValidationUnknown
 	}
 
-	result := lib.Syscall(fn, p.ptr)
+	result := lib.AlpmPkgGetValidation(p.ptr)
 	return PkgValidation(result)
 }
 
@@ -734,24 +701,15 @@ func (p *package_) Contains(path string) bool {
 		return false
 	}
 
-	getFilesFn, err := p.registry.GetFunc("alpm_pkg_get_files")
-	if err != nil {
+	if lib.AlpmPkgGetFiles == nil || lib.AlpmPkgGetFilesContains == nil {
 		return false
 	}
 
-	filelistPtr := lib.Syscall(getFilesFn, p.ptr)
+	filelistPtr := lib.AlpmPkgGetFiles(p.ptr)
 	if filelistPtr == 0 {
 		return false
 	}
-
-	containsFn, err := p.registry.GetFunc("alpm_filelist_contains")
-	if err != nil {
-		return false
-	}
-
-	cPath := lib.CString(path)
-	result := lib.Syscall(containsFn, filelistPtr, uintptr(unsafe.Pointer(&cPath[0])))
-	runtime.KeepAlive(cPath)
+	result := lib.AlpmPkgGetFilesContains(filelistPtr, path)
 
 	return result != 0
 }
@@ -761,12 +719,11 @@ func (p *package_) Changelog() (io.ReadCloser, error) {
 		return nil, ErrInvalidPackage
 	}
 
-	fn, err := p.registry.GetFunc("alpm_pkg_changelog_open")
-	if err != nil {
-		return nil, err
+	if lib.AlpmPkgChangelogOpen == nil {
+		return nil, stderrors.New("missing function: alpm_pkg_changelog_open")
 	}
 
-	fp := lib.Syscall(fn, p.ptr)
+	fp := lib.AlpmPkgChangelogOpen(p.ptr)
 	if fp == 0 {
 		return nil, stderrors.New("no changelog found")
 	}
@@ -782,8 +739,7 @@ func (p *package_) SyncGetNewVersion(dbsSync []Database) Package {
 		return nil
 	}
 
-	fn, err := p.registry.GetFunc("alpm_sync_get_new_version")
-	if err != nil {
+	if lib.AlpmPkgSyncGetNewVersion == nil {
 		return nil
 	}
 
@@ -796,7 +752,7 @@ func (p *package_) SyncGetNewVersion(dbsSync []Database) Package {
 	}
 	defer dbList.Free()
 
-	r1 := lib.Syscall(fn, p.ptr, dbList.Ptr())
+	r1 := lib.AlpmPkgSyncGetNewVersion(p.ptr, dbList.Ptr())
 	if r1 == 0 {
 		return nil
 	}
@@ -814,13 +770,12 @@ func (r *changelogReader) Read(p []byte) (n int, err error) {
 		return 0, io.EOF
 	}
 
-	fn, err := r.pkg.registry.GetFunc("alpm_pkg_changelog_read")
-	if err != nil {
-		return 0, err
+	if lib.AlpmPkgChangelogRead == nil {
+		return 0, stderrors.New("missing function: alpm_pkg_changelog_read")
 	}
 
 	// size_t alpm_pkg_changelog_read(void *ptr, size_t size, const alpm_pkg_t *pkg, void *fp);
-	res, _, _ := purego.SyscallN(fn, uintptr(unsafe.Pointer(&p[0])), uintptr(len(p)), r.pkg.ptr, r.fp)
+	res := lib.AlpmPkgChangelogRead(uintptr(unsafe.Pointer(&p[0])), uintptr(len(p)), r.pkg.ptr, r.fp)
 	if res == 0 {
 		return 0, io.EOF
 	}
@@ -832,12 +787,11 @@ func (r *changelogReader) Close() error {
 		return nil
 	}
 
-	fn, err := r.pkg.registry.GetFunc("alpm_pkg_changelog_close")
-	if err != nil {
-		return err
+	if lib.AlpmPkgChangelogClose == nil {
+		return stderrors.New("missing function: alpm_pkg_changelog_close")
 	}
 
-	purego.SyscallN(fn, r.pkg.ptr, r.fp)
+	lib.AlpmPkgChangelogClose(r.pkg.ptr, r.fp)
 	r.fp = 0
 	return nil
 }
@@ -850,11 +804,10 @@ func (p *package_) Base() string {
 	if p.ptr == 0 {
 		return ""
 	}
-	fn := cachedFunc("alpm_pkg_get_base")
-	if fn == 0 {
+	if lib.AlpmPkgGetBase == nil {
 		return ""
 	}
-	result := lib.Syscall(fn, p.ptr)
+	result := lib.AlpmPkgGetBase(p.ptr)
 	return lib.PtrToString(result)
 }
 
@@ -862,11 +815,10 @@ func (p *package_) FileName() string {
 	if p.ptr == 0 {
 		return ""
 	}
-	fn, err := p.registry.GetFunc("alpm_pkg_get_filename")
-	if err != nil {
+	if lib.AlpmPkgGetFilename == nil {
 		return ""
 	}
-	result := lib.Syscall(fn, p.ptr)
+	result := lib.AlpmPkgGetFilename(p.ptr)
 	return lib.PtrToString(result)
 }
 
@@ -878,11 +830,10 @@ func (p *package_) SHA256Sum() string {
 	if p.ptr == 0 {
 		return ""
 	}
-	fn, err := p.registry.GetFunc("alpm_pkg_get_sha256sum")
-	if err != nil {
+	if lib.AlpmPkgGetSha256sum == nil {
 		return ""
 	}
-	result := lib.Syscall(fn, p.ptr)
+	result := lib.AlpmPkgGetSha256sum(p.ptr)
 	return lib.PtrToString(result)
 }
 
@@ -890,11 +841,10 @@ func (p *package_) Packager() string {
 	if p.ptr == 0 {
 		return ""
 	}
-	fn, err := p.registry.GetFunc("alpm_pkg_get_packager")
-	if err != nil {
+	if lib.AlpmPkgGetPackager == nil {
 		return ""
 	}
-	result := lib.Syscall(fn, p.ptr)
+	result := lib.AlpmPkgGetPackager(p.ptr)
 	return lib.PtrToString(result)
 }
 
@@ -902,11 +852,10 @@ func (p *package_) URL() string {
 	if p.ptr == 0 {
 		return ""
 	}
-	fn, err := p.registry.GetFunc("alpm_pkg_get_url")
-	if err != nil {
+	if lib.AlpmPkgGetURL == nil {
 		return ""
 	}
-	result := lib.Syscall(fn, p.ptr)
+	result := lib.AlpmPkgGetURL(p.ptr)
 	return lib.PtrToString(result)
 }
 

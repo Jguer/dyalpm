@@ -168,64 +168,29 @@ type Handle interface {
 }
 
 type handle struct {
-	ptr      uintptr
-	registry *lib.FunctionRegistry
+	ptr uintptr
 }
 
 // Initialize creates a new ALPM handle
 func Initialize(root, dbpath string) (Handle, error) {
-	reg, err := lib.GetRegistry()
-	if err != nil {
+	if err := lib.EnsureAlpmLoaded(); err != nil {
 		return nil, err
 	}
-
-	// Get function pointer for initialization
-	initFn, err := reg.GetFunc("alpm_initialize")
-	if err != nil {
-		return nil, err
+	if lib.AlpmInitialize == nil {
+		return nil, stderrors.New("missing function: alpm_initialize")
 	}
 
-	// Call alpm_initialize
-	// Note: alpm_initialize signature is:
-	// alpm_handle_t *alpm_initialize(const char *root, const char *dbpath, alpm_errno_t *err)
-	// We need to pass a pointer to errno, but purego.SyscallN doesn't support output parameters directly
-	// We'll allocate space for the errno and check it after the call
-	var errnoVal dyerrors.Errno
-	errnoPtr := uintptr(unsafe.Pointer(&errnoVal))
-
-	// Create null-terminated strings
-	rootBytes := make([]byte, len(root)+1)
-	copy(rootBytes, root)
-	rootBytes[len(root)] = 0
-	rootPtr := uintptr(unsafe.Pointer(&rootBytes[0]))
-
-	dbpathBytes := make([]byte, len(dbpath)+1)
-	copy(dbpathBytes, dbpath)
-	dbpathBytes[len(dbpath)] = 0
-	dbpathPtr := uintptr(unsafe.Pointer(&dbpathBytes[0]))
-
-	handlePtr := lib.Syscall(initFn,
-		rootPtr,
-		dbpathPtr,
-		errnoPtr,
-	)
-
-	// Keep buffers alive during the call
-	runtime.KeepAlive(rootBytes)
-	runtime.KeepAlive(dbpathBytes)
+	var errno int32
+	handlePtr := lib.AlpmInitialize(root, dbpath, &errno)
 
 	if handlePtr == 0 {
-		// Check the errno value that was set
-		if errnoVal != dyerrors.ErrOK {
-			return nil, dyerrors.NewError(errnoVal, "failed to initialize ALPM handle")
+		if errno != 0 {
+			return nil, dyerrors.NewError(dyerrors.Errno(errno), "failed to initialize ALPM handle")
 		}
 		return nil, dyerrors.NewError(dyerrors.ErrSystem, "failed to initialize ALPM handle")
 	}
 
-	return &handle{
-		ptr:      handlePtr,
-		registry: reg,
-	}, nil
+	return &handle{ptr: handlePtr}, nil
 }
 
 func (h *handle) Release() error {
@@ -235,12 +200,12 @@ func (h *handle) Release() error {
 
 	oldPtr := h.ptr
 
-	releaseFn, err := h.registry.GetFunc("alpm_release")
-	if err != nil {
-		return err
+	if lib.AlpmRelease == nil {
+		return stderrors.New("missing function: alpm_release")
 	}
 
-	r1, _, errno := purego.SyscallN(releaseFn, h.ptr)
+	r1 := uint64(lib.AlpmRelease(h.ptr))
+	errno := lib.AlpmErrno(h.ptr)
 	if errno != 0 || r1 != 0 {
 		return stderrors.New("failed to release handle")
 	}
@@ -254,29 +219,22 @@ func (h *handle) Errno() dyerrors.Errno {
 	if h.ptr == 0 {
 		return dyerrors.ErrHandleNull
 	}
-
-	errnoFn, err := h.registry.GetFunc("alpm_errno")
-	if err != nil {
+	if lib.AlpmErrno == nil {
 		return dyerrors.ErrSystem
 	}
-
-	r1, _, _ := purego.SyscallN(errnoFn, h.ptr)
-	return dyerrors.Errno(r1)
+	return dyerrors.Errno(lib.AlpmErrno(h.ptr))
 }
 
 func (h *handle) StrError(errno dyerrors.Errno) string {
-	strerrorFn, err := h.registry.GetFunc("alpm_strerror")
-	if err != nil {
+	if lib.AlpmStrerror == nil {
 		return "unknown error"
 	}
 
-	r1, _, _ := purego.SyscallN(strerrorFn, uintptr(errno))
+	r1 := lib.AlpmStrerror(int32(errno))
 	if r1 == 0 {
 		return "unknown error"
 	}
 
-	// Convert C string to Go string
-	// We need to find the null terminator
 	return lib.PtrToString(r1)
 }
 
@@ -284,60 +242,44 @@ func (h *handle) Root() string {
 	if h.ptr == 0 {
 		return ""
 	}
-
-	getRootFn, err := h.registry.GetFunc("alpm_option_get_root")
-	if err != nil {
+	if lib.AlpmOptionGetRoot == nil {
 		return ""
 	}
-
-	r1, _, _ := purego.SyscallN(getRootFn, h.ptr)
-	return lib.PtrToString(r1)
+	return lib.PtrToString(lib.AlpmOptionGetRoot(h.ptr))
 }
 
 func (h *handle) DBPath() string {
 	if h.ptr == 0 {
 		return ""
 	}
-
-	getDBPathFn, err := h.registry.GetFunc("alpm_option_get_dbpath")
-	if err != nil {
+	if lib.AlpmOptionGetDbpath == nil {
 		return ""
 	}
-
-	r1, _, _ := purego.SyscallN(getDBPathFn, h.ptr)
-	return lib.PtrToString(r1)
+	return lib.PtrToString(lib.AlpmOptionGetDbpath(h.ptr))
 }
 
 func (h *handle) getLocalDB() (Database, error) {
 	if h.ptr == 0 {
 		return nil, stderrors.New("handle is invalid")
 	}
-
-	getLocalDBFn, err := h.registry.GetFunc("alpm_get_localdb")
-	if err != nil {
-		return nil, err
+	if lib.AlpmGetLocalDB == nil {
+		return nil, stderrors.New("missing function: alpm_get_localdb")
 	}
-
-	r1, _, _ := purego.SyscallN(getLocalDBFn, h.ptr)
+	r1 := lib.AlpmGetLocalDB(h.ptr)
 	if r1 == 0 {
 		return nil, dyerrors.NewError(h.Errno(), "failed to get local database")
 	}
-	dbPtr := r1
-
-	return newDatabase(dbPtr, h), nil
+	return newDatabase(r1, h), nil
 }
 
 func (h *handle) getSyncDBs() ([]Database, error) {
 	if h.ptr == 0 {
 		return nil, stderrors.New("handle is invalid")
 	}
-
-	getSyncDBsFn, err := h.registry.GetFunc("alpm_get_syncdbs")
-	if err != nil {
-		return nil, err
+	if lib.AlpmGetSyncDBS == nil {
+		return nil, stderrors.New("missing function: alpm_get_syncdbs")
 	}
-
-	r1, _, _ := purego.SyscallN(getSyncDBsFn, h.ptr)
+	r1 := lib.AlpmGetSyncDBS(h.ptr)
 	if r1 == 0 {
 		errno := h.Errno()
 		if errno != dyerrors.ErrOK {
@@ -406,13 +348,11 @@ func (h *handle) TransInit(flags TransactionFlag) error {
 	if h.ptr == 0 {
 		return stderrors.New("invalid handle")
 	}
-
-	initFn, err := h.registry.GetFunc("alpm_trans_init")
-	if err != nil {
-		return err
+	if lib.AlpmTransInit == nil {
+		return stderrors.New("missing function: alpm_trans_init")
 	}
 
-	result := lib.Syscall(initFn, h.ptr, uintptr(flags))
+	result := lib.AlpmTransInit(h.ptr, uintptr(flags))
 	if result != 0 {
 		return stderrors.New("failed to initialize transaction")
 	}
@@ -424,13 +364,11 @@ func (h *handle) TransRelease() error {
 	if h.ptr == 0 {
 		return stderrors.New("invalid handle")
 	}
-
-	releaseFn, err := h.registry.GetFunc("alpm_trans_release")
-	if err != nil {
-		return err
+	if lib.AlpmTransRelease == nil {
+		return stderrors.New("missing function: alpm_trans_release")
 	}
 
-	result := lib.Syscall(releaseFn, h.ptr)
+	result := lib.AlpmTransRelease(h.ptr)
 	if result != 0 {
 		return stderrors.New("failed to release transaction")
 	}
@@ -442,18 +380,15 @@ func (h *handle) SyncSysupgrade(enableDowngrade bool) error {
 	if h.ptr == 0 {
 		return stderrors.New("invalid handle")
 	}
-
-	upgradeFn, err := h.registry.GetFunc("alpm_sync_sysupgrade")
-	if err != nil {
-		return err
+	if lib.AlpmSyncSysupgrade == nil {
+		return stderrors.New("missing function: alpm_sync_sysupgrade")
 	}
 
-	downgrade := uintptr(0)
+	down := int32(0)
 	if enableDowngrade {
-		downgrade = 1
+		down = 1
 	}
-
-	result := lib.Syscall(upgradeFn, h.ptr, downgrade)
+	result := lib.AlpmSyncSysupgrade(h.ptr, down)
 	if result != 0 {
 		return stderrors.New("failed to sync sysupgrade")
 	}
@@ -465,13 +400,10 @@ func (h *handle) TransGetAdd() PackageIterator {
 	if h.ptr == 0 {
 		return PackageIterator{}
 	}
-
-	getAddFn, err := h.registry.GetFunc("alpm_trans_get_add")
-	if err != nil {
+	if lib.AlpmTransGetAdd == nil {
 		return PackageIterator{}
 	}
-
-	listPtr := lib.Syscall(getAddFn, h.ptr)
+	listPtr := lib.AlpmTransGetAdd(h.ptr)
 	if listPtr == 0 {
 		return PackageIterator{}
 	}
@@ -483,35 +415,26 @@ func (h *handle) RegisterSyncDB(name string, siglevel int) (Database, error) {
 	if h.ptr == 0 {
 		return nil, stderrors.New("handle is invalid")
 	}
-
-	registerFn, err := h.registry.GetFunc("alpm_register_syncdb")
-	if err != nil {
-		return nil, err
+	if lib.AlpmRegisterSyncDB == nil {
+		return nil, stderrors.New("missing function: alpm_register_syncdb")
 	}
 
-	nameBytes := lib.CString(name)
-	namePtr := uintptr(unsafe.Pointer(&nameBytes[0]))
-	r1, _, _ := purego.SyscallN(registerFn, h.ptr, namePtr, uintptr(siglevel))
-	runtime.KeepAlive(nameBytes)
+	r1 := lib.AlpmRegisterSyncDB(h.ptr, name, int32(siglevel))
 	if r1 == 0 {
 		return nil, dyerrors.NewError(h.Errno(), "failed to register sync database")
 	}
-	dbPtr := r1
-
-	return newDatabase(dbPtr, h), nil
+	return newDatabase(r1, h), nil
 }
 
 func (h *handle) UnregisterAllSyncDBs() error {
 	if h.ptr == 0 {
 		return dyerrors.ErrHandleNull
 	}
-
-	unregisterFn, err := h.registry.GetFunc("alpm_unregister_all_syncdbs")
-	if err != nil {
-		return err
+	if lib.AlpmUnregisterAllSyncDBs == nil {
+		return stderrors.New("missing function: alpm_unregister_all_syncdbs")
 	}
 
-	result := lib.Syscall(unregisterFn, h.ptr)
+	result := lib.AlpmUnregisterAllSyncDBs(h.ptr)
 	if result != 0 {
 		return ErrDatabaseUnregisterFailed
 	}
@@ -524,9 +447,8 @@ func (h *handle) LogAction(prefix, message string) error {
 		return dyerrors.ErrHandleNull
 	}
 
-	fn, err := h.registry.GetFunc("alpm_logaction")
-	if err != nil {
-		return err
+	if lib.AlpmLogactionSym == 0 {
+		return stderrors.New("missing function: alpm_logaction")
 	}
 
 	cPrefix := lib.CString(prefix)
@@ -534,7 +456,7 @@ func (h *handle) LogAction(prefix, message string) error {
 	cFmt := lib.CString("%s")
 
 	r1, _, _ := purego.SyscallN(
-		fn,
+		lib.AlpmLogactionSym,
 		h.ptr,
 		uintptr(unsafe.Pointer(&cPrefix[0])),
 		uintptr(unsafe.Pointer(&cFmt[0])),
@@ -555,14 +477,11 @@ func (h *handle) Unlock() error {
 	if h.ptr == 0 {
 		return dyerrors.ErrHandleNull
 	}
-
-	fn, err := h.registry.GetFunc("alpm_unlock")
-	if err != nil {
-		return err
+	if lib.AlpmUnlock == nil {
+		return stderrors.New("missing function: alpm_unlock")
 	}
 
-	r1, _, _ := purego.SyscallN(fn, h.ptr)
-	if r1 != 0 {
+	if lib.AlpmUnlock(h.ptr) != 0 {
 		return stderrors.New("failed to unlock")
 	}
 
@@ -573,10 +492,8 @@ func (h *handle) FetchPkgURL(url string) (string, error) {
 	if h.ptr == 0 {
 		return "", dyerrors.ErrHandleNull
 	}
-
-	fn, err := h.registry.GetFunc("alpm_fetch_pkgurl")
-	if err != nil {
-		return "", err
+	if lib.AlpmFetchPkgurl == nil {
+		return "", stderrors.New("missing function: alpm_fetch_pkgurl")
 	}
 
 	// alpm_fetch_pkgurl(handle, urls_list, &fetched_list)
@@ -588,7 +505,7 @@ func (h *handle) FetchPkgURL(url string) (string, error) {
 	defer urlList.Free()
 
 	var fetchedListPtr uintptr
-	r1, _, _ := purego.SyscallN(fn, h.ptr, urlList.Ptr(), uintptr(unsafe.Pointer(&fetchedListPtr)))
+	r1 := int(lib.AlpmFetchPkgurl(h.ptr, urlList.Ptr(), &fetchedListPtr))
 	runtime.KeepAlive(cURL)
 
 	if r1 != 0 {
@@ -617,14 +534,10 @@ func (h *handle) InterruptTransaction() error {
 	if h.ptr == 0 {
 		return dyerrors.ErrHandleNull
 	}
-
-	fn, err := h.registry.GetFunc("alpm_trans_interrupt")
-	if err != nil {
-		return err
+	if lib.AlpmTransInterrupt == nil {
+		return stderrors.New("missing function: alpm_trans_interrupt")
 	}
-
-	r1, _, _ := purego.SyscallN(fn, h.ptr)
-	if r1 != 0 {
+	if lib.AlpmTransInterrupt(h.ptr) != 0 {
 		return stderrors.New("failed to interrupt transaction")
 	}
 
@@ -635,21 +548,10 @@ func (h *handle) SandboxSetupChild(user, dir string) error {
 	if h.ptr == 0 {
 		return dyerrors.ErrHandleNull
 	}
-
-	fn, err := h.registry.GetFunc("alpm_sandbox_setup_child")
-	if err != nil {
-		return err
+	if lib.AlpmSandboxSetupChild == nil {
+		return stderrors.New("missing function: alpm_sandbox_setup_child")
 	}
-
-	cUser := lib.CString(user)
-	cDir := lib.CString(dir)
-
-	r1, _, _ := purego.SyscallN(fn, h.ptr, uintptr(unsafe.Pointer(&cUser[0])), uintptr(unsafe.Pointer(&cDir[0])))
-
-	runtime.KeepAlive(cUser)
-	runtime.KeepAlive(cDir)
-
-	if r1 != 0 {
+	if lib.AlpmSandboxSetupChild(h.ptr, user, dir) != 0 {
 		return stderrors.New("failed to setup sandbox child")
 	}
 

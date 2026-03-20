@@ -1,6 +1,7 @@
 package dyalpm
 
 import (
+	stderrors "errors"
 	"sync"
 	"unsafe"
 
@@ -168,17 +169,42 @@ func (h *handle) getCallbackPair(getName, getCtxName string) (cb uintptr, ctx ui
 		return 0, 0
 	}
 
-	getFn, err := h.registry.GetFunc(getName)
-	if err != nil {
-		return 0, 0
+	var getFn func(uintptr) uintptr
+	var getCtxFn func(uintptr) uintptr
+	switch getName {
+	case "alpm_option_get_logcb":
+		getFn = lib.AlpmOptionGetLogcb
+	case "alpm_option_get_dlcb":
+		getFn = lib.AlpmOptionGetDlcb
+	case "alpm_option_get_fetchcb":
+		getFn = lib.AlpmOptionGetFetchcb
+	case "alpm_option_get_eventcb":
+		getFn = lib.AlpmOptionGetEventcb
+	case "alpm_option_get_questioncb":
+		getFn = lib.AlpmOptionGetQuestioncb
+	case "alpm_option_get_progresscb":
+		getFn = lib.AlpmOptionGetProgresscb
 	}
-	getCtxFn, err := h.registry.GetFunc(getCtxName)
-	if err != nil {
+	switch getCtxName {
+	case "alpm_option_get_logcb_ctx":
+		getCtxFn = lib.AlpmOptionGetLogcbCtx
+	case "alpm_option_get_dlcb_ctx":
+		getCtxFn = lib.AlpmOptionGetDlcbCtx
+	case "alpm_option_get_fetchcb_ctx":
+		getCtxFn = lib.AlpmOptionGetFetchcbCtx
+	case "alpm_option_get_eventcb_ctx":
+		getCtxFn = lib.AlpmOptionGetEventcbCtx
+	case "alpm_option_get_questioncb_ctx":
+		getCtxFn = lib.AlpmOptionGetQuestioncbCtx
+	case "alpm_option_get_progresscb_ctx":
+		getCtxFn = lib.AlpmOptionGetProgresscbCtx
+	}
+	if getFn == nil || getCtxFn == nil {
 		return 0, 0
 	}
 
-	cb = lib.Syscall(getFn, h.ptr)
-	ctx = lib.Syscall(getCtxFn, h.ptr)
+	cb = getFn(h.ptr)
+	ctx = getCtxFn(h.ptr)
 	return cb, ctx
 }
 
@@ -187,12 +213,26 @@ func (h *handle) setCallback(setName string, cb uintptr, ctx uintptr) error {
 		return alpmerrors.ErrHandleNull
 	}
 
-	setFn, err := h.registry.GetFunc(setName)
-	if err != nil {
-		return err
+	var setFn func(uintptr, uintptr, uintptr) int32
+	switch setName {
+	case "alpm_option_set_logcb":
+		setFn = lib.AlpmOptionSetLogcb
+	case "alpm_option_set_dlcb":
+		setFn = lib.AlpmOptionSetDlcb
+	case "alpm_option_set_fetchcb":
+		setFn = lib.AlpmOptionSetFetchcb
+	case "alpm_option_set_eventcb":
+		setFn = lib.AlpmOptionSetEventcb
+	case "alpm_option_set_questioncb":
+		setFn = lib.AlpmOptionSetQuestioncb
+	case "alpm_option_set_progresscb":
+		setFn = lib.AlpmOptionSetProgresscb
+	}
+	if setFn == nil {
+		return stderrors.New("missing function: " + setName)
 	}
 
-	r1 := lib.Syscall(setFn, h.ptr, cb, ctx)
+	r1 := setFn(h.ptr, cb, ctx)
 	if r1 != 0 {
 		return alpmerrors.NewError(h.Errno(), "failed to set callback")
 	}
