@@ -1,8 +1,9 @@
 package list
 
 import (
-	"github.com/Jguer/dyalpm/internal/lib"
 	"unsafe"
+
+	"github.com/Jguer/dyalpm/internal/lib"
 )
 
 // List represents an ALPM list node

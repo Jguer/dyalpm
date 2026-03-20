@@ -430,7 +430,8 @@ func (d *database) SetUsage(usage int) error {
 		return stderrors.New("missing function: alpm_db_set_usage")
 	}
 
-	result := lib.AlpmDBSetUsage(d.ptr, int32(usage))
+	usageInt32 := clampIntToInt32(usage)
+	result := lib.AlpmDBSetUsage(d.ptr, usageInt32)
 	if result != 0 {
 		return ErrDatabaseUpdateFailed
 	}

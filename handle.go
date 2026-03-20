@@ -204,7 +204,7 @@ func (h *handle) Release() error {
 		return stderrors.New("missing function: alpm_release")
 	}
 
-	r1 := uint64(lib.AlpmRelease(h.ptr))
+	r1 := lib.AlpmRelease(h.ptr)
 	errno := lib.AlpmErrno(h.ptr)
 	if errno != 0 || r1 != 0 {
 		return stderrors.New("failed to release handle")
@@ -230,7 +230,7 @@ func (h *handle) StrError(errno dyerrors.Errno) string {
 		return "unknown error"
 	}
 
-	r1 := lib.AlpmStrerror(int32(errno))
+	r1 := lib.AlpmStrerror(clampIntToInt32(int(errno)))
 	if r1 == 0 {
 		return "unknown error"
 	}
@@ -419,7 +419,8 @@ func (h *handle) RegisterSyncDB(name string, siglevel int) (Database, error) {
 		return nil, stderrors.New("missing function: alpm_register_syncdb")
 	}
 
-	r1 := lib.AlpmRegisterSyncDB(h.ptr, name, int32(siglevel))
+	siglevelInt32 := clampIntToInt32(siglevel)
+	r1 := lib.AlpmRegisterSyncDB(h.ptr, name, siglevelInt32)
 	if r1 == 0 {
 		return nil, dyerrors.NewError(h.Errno(), "failed to register sync database")
 	}

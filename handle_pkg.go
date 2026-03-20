@@ -21,7 +21,8 @@ func (h *handle) LoadPackage(filename string, full bool, siglevel int) (Package,
 	if full {
 		fullInt = 1
 	}
-	result := lib.AlpmPkgLoad(h.ptr, filename, fullInt, int32(siglevel), &pkgPtr)
+	siglevelInt32 := clampIntToInt32(siglevel)
+	result := lib.AlpmPkgLoad(h.ptr, filename, fullInt, siglevelInt32, &pkgPtr)
 
 	if result != 0 {
 		return nil, dyerrors.NewError(h.Errno(), "failed to load package")

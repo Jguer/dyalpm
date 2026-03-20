@@ -774,7 +774,7 @@ func (h *handle) setOptionDepList(funcName string, deps []Dependency) error {
 		listPtr = alpmList.Ptr()
 	}
 
-	r1 := int32(lib.AlpmOptionSetNoassumeInstalled(h.ptr, listPtr))
+	r1 := lib.AlpmOptionSetNoassumeInstalled(h.ptr, listPtr)
 	runtime.KeepAlive(alpmList)
 
 	if r1 != 0 {

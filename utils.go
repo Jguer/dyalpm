@@ -107,7 +107,8 @@ func (h *handle) ExtractKeyID(identifier string, sig []byte) ([]string, error) {
 		sigPtr = uintptr(unsafe.Pointer(&sig[0]))
 	}
 
-	r1 := lib.AlpmExtractKeyID(h.ptr, identifier, sigPtr, int32(len(sig)), &keysListPtr)
+	sigLenInt32 := clampIntToInt32(len(sig))
+	r1 := lib.AlpmExtractKeyID(h.ptr, identifier, sigPtr, sigLenInt32, &keysListPtr)
 
 	runtime.KeepAlive(sig)
 
