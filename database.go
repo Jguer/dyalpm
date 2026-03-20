@@ -195,6 +195,7 @@ func (d *database) Search(needles []string) PackageIterator {
 	if alpmList == nil {
 		return PackageIterator{}
 	}
+	defer alpmList.Free()
 
 	var resultListPtr uintptr
 	ret := int(lib.AlpmDBSearch(d.ptr, alpmList.Ptr(), &resultListPtr))
@@ -322,6 +323,9 @@ func (d *database) setServers(funcName string, servers []string) error {
 		cs := lib.CString(s)
 		cStrings = append(cStrings, cs)
 		alpmList = list.Add(alpmList, uintptr(unsafe.Pointer(&cs[0])))
+	}
+	if alpmList != nil {
+		defer alpmList.Free()
 	}
 
 	result := setServersFn(d.ptr, alpmList.Ptr())

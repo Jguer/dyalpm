@@ -133,6 +133,7 @@ func (t *transaction) Prepare() ([]DepMissing, error) {
 	if err != nil || alpmList == nil {
 		return []DepMissing{}, err
 	}
+	defer alpmList.Free()
 
 	missing := collectList(alpmList, func(ptr uintptr) DepMissing {
 		return newDepMissing(ptr)
@@ -150,6 +151,7 @@ func (t *transaction) Commit() ([]FileConflict, error) {
 	if err != nil || alpmList == nil {
 		return []FileConflict{}, err
 	}
+	defer alpmList.Free()
 
 	conflicts := collectList(alpmList, func(ptr uintptr) FileConflict {
 		return newFileConflict(ptr)

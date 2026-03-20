@@ -707,6 +707,9 @@ func (h *handle) setOptionStrList(funcName string, values []string) error {
 		cStrings = append(cStrings, cS)
 		alpmList = list.Add(alpmList, uintptr(unsafe.Pointer(&cS[0])))
 	}
+	if alpmList != nil {
+		defer alpmList.Free()
+	}
 
 	var listPtr uintptr
 	if alpmList != nil {
@@ -761,6 +764,9 @@ func (h *handle) setOptionDepList(funcName string, deps []Dependency) error {
 		if ok {
 			alpmList = list.Add(alpmList, depImpl.ptr)
 		}
+	}
+	if alpmList != nil {
+		defer alpmList.Free()
 	}
 
 	var listPtr uintptr
