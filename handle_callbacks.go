@@ -2,6 +2,7 @@ package dyalpm
 
 import (
 	stderrors "errors"
+	"strconv"
 	"sync"
 	"unsafe"
 
@@ -95,6 +96,8 @@ const (
 	minInt32 = -maxInt32 - 1
 )
 
+const maxInt64 = ^uint64(0) >> 1
+
 func clampIntToInt32(value int) int32 {
 	if value > maxInt32 {
 		return int32(maxInt32)
@@ -103,6 +106,20 @@ func clampIntToInt32(value int) int32 {
 		return int32(minInt32)
 	}
 	return int32(value)
+}
+
+func clampUintptrToInt(value uintptr) int {
+	if strconv.IntSize == 64 && uint64(value) > maxInt64 {
+		return int(^uint(0) >> 1)
+	}
+	return int(value)
+}
+
+func clampUintptrToInt64(value uintptr) int64 {
+	if strconv.IntSize == 64 && uint64(value) > maxInt64 {
+		return int64(maxInt64)
+	}
+	return int64(value)
 }
 
 // SetAnswerInt sets the question's "answer" field. The meaning depends on q.Type.

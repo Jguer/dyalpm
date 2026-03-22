@@ -116,7 +116,7 @@ func (t *transaction) Init(flags TransactionFlag) error {
 		return stderrors.New("missing function: alpm_trans_init")
 	}
 
-	result := lib.AlpmTransInit(t.handle.ptr, uintptr(flags))
+	result := lib.AlpmTransInit(t.handle.ptr, clampIntToInt32(int(flags)))
 	if result != 0 {
 		return ErrTransactionInitFailed
 	}
@@ -222,8 +222,11 @@ func (t *transaction) SyncSysupgrade(enableDowngrade bool) error {
 		return stderrors.New("missing function: alpm_sync_sysupgrade")
 	}
 
-	downgradeInt := lib.BoolToInt(enableDowngrade)
-	result := lib.AlpmSyncSysupgrade(t.handle.ptr, int32(downgradeInt))
+	downgrade := int32(0)
+	if enableDowngrade {
+		downgrade = 1
+	}
+	result := lib.AlpmSyncSysupgrade(t.handle.ptr, downgrade)
 	if result != 0 {
 		return ErrSysupgradeFailed
 	}

@@ -96,7 +96,7 @@ var (
 	AlpmOptionAddArchitecture       func(handle uintptr, arch string) int32
 	AlpmOptionRemoveArchitecture    func(handle uintptr, arch string) int32
 
-	AlpmTransInit            func(handle uintptr, flags uintptr) int32
+	AlpmTransInit            func(handle uintptr, flags int32) int32
 	AlpmTransPrepare         func(handle uintptr, list *uintptr) int32
 	AlpmTransCommit          func(handle uintptr, list *uintptr) int32
 	AlpmTransRelease         func(handle uintptr) int32

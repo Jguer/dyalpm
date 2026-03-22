@@ -52,7 +52,7 @@ func PtrToStringWithLen(ptr uintptr, length int) string {
 }
 
 // BoolToInt converts a Go bool to C int (0 or 1)
-func BoolToInt(b bool) uintptr {
+func BoolToInt(b bool) int {
 	if b {
 		return 1
 	}
@@ -60,6 +60,6 @@ func BoolToInt(b bool) uintptr {
 }
 
 // IntToBool converts a C int to Go bool
-func IntToBool(i uintptr) bool {
+func IntToBool(i int32) bool {
 	return i != 0
 }

@@ -103,7 +103,7 @@ func (p *package_) Size() int64 {
 	if lib.AlpmPkgGetSize == nil {
 		return 0
 	}
-	return int64(lib.AlpmPkgGetSize(p.ptr))
+	return clampUintptrToInt64(lib.AlpmPkgGetSize(p.ptr))
 }
 
 func (p *package_) ISize() int64 {
@@ -113,7 +113,7 @@ func (p *package_) ISize() int64 {
 	if lib.AlpmPkgGetISize == nil {
 		return 0
 	}
-	return int64(lib.AlpmPkgGetISize(p.ptr))
+	return clampUintptrToInt64(lib.AlpmPkgGetISize(p.ptr))
 }
 
 func (p *package_) DB() Database {
@@ -546,7 +546,7 @@ func (p *package_) DownloadSize() int64 {
 		return 0
 	}
 
-	return int64(lib.AlpmPkgDownloadSize(p.ptr))
+	return clampUintptrToInt64(lib.AlpmPkgDownloadSize(p.ptr))
 }
 
 func (p *package_) Free() error {

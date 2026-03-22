@@ -352,7 +352,7 @@ func (h *handle) TransInit(flags TransactionFlag) error {
 		return stderrors.New("missing function: alpm_trans_init")
 	}
 
-	result := lib.AlpmTransInit(h.ptr, uintptr(flags))
+	result := lib.AlpmTransInit(h.ptr, clampIntToInt32(int(flags)))
 	if result != 0 {
 		return stderrors.New("failed to initialize transaction")
 	}

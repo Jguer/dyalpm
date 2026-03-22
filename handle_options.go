@@ -27,7 +27,11 @@ func (h *handle) GPGDir() string {
 }
 
 func (h *handle) SetUseSyslog(enable bool) error {
-	return h.setOptionInt("alpm_option_set_usesyslog", lib.BoolToInt(enable))
+	value := 0
+	if enable {
+		value = 1
+	}
+	return h.setOptionInt("alpm_option_set_usesyslog", value)
 }
 
 func (h *handle) UseSyslog() bool {
@@ -36,7 +40,11 @@ func (h *handle) UseSyslog() bool {
 }
 
 func (h *handle) SetCheckSpace(enable bool) error {
-	return h.setOptionInt("alpm_option_set_checkspace", lib.BoolToInt(enable))
+	value := 0
+	if enable {
+		value = 1
+	}
+	return h.setOptionInt("alpm_option_set_checkspace", value)
 }
 
 func (h *handle) CheckSpace() bool {
@@ -53,7 +61,7 @@ func (h *handle) DBExt() string {
 }
 
 func (h *handle) SetDefaultSigLevel(level int) error {
-	return h.setOptionInt("alpm_option_set_default_siglevel", uintptr(level))
+	return h.setOptionInt("alpm_option_set_default_siglevel", level)
 }
 
 func (h *handle) DefaultSigLevel() int {
@@ -61,7 +69,7 @@ func (h *handle) DefaultSigLevel() int {
 }
 
 func (h *handle) SetLocalFileSigLevel(level int) error {
-	return h.setOptionInt("alpm_option_set_local_file_siglevel", uintptr(level))
+	return h.setOptionInt("alpm_option_set_local_file_siglevel", level)
 }
 
 func (h *handle) LocalFileSigLevel() int {
@@ -69,7 +77,7 @@ func (h *handle) LocalFileSigLevel() int {
 }
 
 func (h *handle) SetRemoteFileSigLevel(level int) error {
-	return h.setOptionInt("alpm_option_set_remote_file_siglevel", uintptr(level))
+	return h.setOptionInt("alpm_option_set_remote_file_siglevel", level)
 }
 
 func (h *handle) RemoteFileSigLevel() int {
@@ -77,7 +85,7 @@ func (h *handle) RemoteFileSigLevel() int {
 }
 
 func (h *handle) SetParallelDownloads(num int) error {
-	return h.setOptionInt("alpm_option_set_parallel_downloads", uintptr(num))
+	return h.setOptionInt("alpm_option_set_parallel_downloads", num)
 }
 
 func (h *handle) ParallelDownloads() int {
@@ -213,11 +221,19 @@ func (h *handle) SandboxUser() string {
 }
 
 func (h *handle) SetDisableDLTimeout(disable bool) error {
-	return h.setOptionInt("alpm_option_set_disable_dl_timeout", lib.BoolToInt(disable))
+	value := 0
+	if disable {
+		value = 1
+	}
+	return h.setOptionInt("alpm_option_set_disable_dl_timeout", value)
 }
 
 func (h *handle) SetDisableSandbox(disable bool) error {
-	return h.setOptionInt("alpm_option_set_disable_sandbox", lib.BoolToInt(disable))
+	value := 0
+	if disable {
+		value = 1
+	}
+	return h.setOptionInt("alpm_option_set_disable_sandbox", value)
 }
 
 func (h *handle) AssumeInstalled() ([]Dependency, error) {
@@ -491,10 +507,12 @@ func (h *handle) getOptionStr(funcName string) string {
 	}
 }
 
-func (h *handle) setOptionInt(funcName string, value uintptr) error {
+func (h *handle) setOptionInt(funcName string, value int) error {
 	if h.ptr == 0 {
 		return dyerrors.ErrHandleNull
 	}
+
+	valueInt32 := clampIntToInt32(value)
 
 	var result int32
 	switch funcName {
@@ -502,42 +520,42 @@ func (h *handle) setOptionInt(funcName string, value uintptr) error {
 		if lib.AlpmOptionSetUseSyslog == nil {
 			return errors.New("function unavailable: alpm_option_set_usesyslog")
 		}
-		result = lib.AlpmOptionSetUseSyslog(h.ptr, int32(value))
+		result = lib.AlpmOptionSetUseSyslog(h.ptr, valueInt32)
 	case "alpm_option_set_checkspace":
 		if lib.AlpmOptionSetCheckspace == nil {
 			return errors.New("function unavailable: alpm_option_set_checkspace")
 		}
-		result = lib.AlpmOptionSetCheckspace(h.ptr, int32(value))
+		result = lib.AlpmOptionSetCheckspace(h.ptr, valueInt32)
 	case "alpm_option_set_default_siglevel":
 		if lib.AlpmOptionSetDefaultSigLevel == nil {
 			return errors.New("function unavailable: alpm_option_set_default_siglevel")
 		}
-		result = lib.AlpmOptionSetDefaultSigLevel(h.ptr, int32(value))
+		result = lib.AlpmOptionSetDefaultSigLevel(h.ptr, valueInt32)
 	case "alpm_option_set_local_file_siglevel":
 		if lib.AlpmOptionSetLocalFileSigLevel == nil {
 			return errors.New("function unavailable: alpm_option_set_local_file_siglevel")
 		}
-		result = lib.AlpmOptionSetLocalFileSigLevel(h.ptr, int32(value))
+		result = lib.AlpmOptionSetLocalFileSigLevel(h.ptr, valueInt32)
 	case "alpm_option_set_remote_file_siglevel":
 		if lib.AlpmOptionSetRemoteFileSigLevel == nil {
 			return errors.New("function unavailable: alpm_option_set_remote_file_siglevel")
 		}
-		result = lib.AlpmOptionSetRemoteFileSigLevel(h.ptr, int32(value))
+		result = lib.AlpmOptionSetRemoteFileSigLevel(h.ptr, valueInt32)
 	case "alpm_option_set_parallel_downloads":
 		if lib.AlpmOptionSetParallelDownloads == nil {
 			return errors.New("function unavailable: alpm_option_set_parallel_downloads")
 		}
-		result = lib.AlpmOptionSetParallelDownloads(h.ptr, int32(value))
+		result = lib.AlpmOptionSetParallelDownloads(h.ptr, valueInt32)
 	case "alpm_option_set_disable_dl_timeout":
 		if lib.AlpmOptionSetDisableDlTimeout == nil {
 			return errors.New("function unavailable: alpm_option_set_disable_dl_timeout")
 		}
-		result = lib.AlpmOptionSetDisableDlTimeout(h.ptr, int32(value))
+		result = lib.AlpmOptionSetDisableDlTimeout(h.ptr, valueInt32)
 	case "alpm_option_set_disable_sandbox":
 		if lib.AlpmOptionSetDisableSandbox == nil {
 			return errors.New("function unavailable: alpm_option_set_disable_sandbox")
 		}
-		result = lib.AlpmOptionSetDisableSandbox(h.ptr, int32(value))
+		result = lib.AlpmOptionSetDisableSandbox(h.ptr, valueInt32)
 	default:
 		return errors.New("unsupported function: " + funcName)
 	}
@@ -548,7 +566,7 @@ func (h *handle) setOptionInt(funcName string, value uintptr) error {
 	return nil
 }
 
-func (h *handle) getOptionInt(funcName string) uintptr {
+func (h *handle) getOptionInt(funcName string) int32 {
 	if h.ptr == 0 {
 		return 0
 	}
@@ -557,32 +575,32 @@ func (h *handle) getOptionInt(funcName string) uintptr {
 		if lib.AlpmOptionGetUseSyslog == nil {
 			return 0
 		}
-		return uintptr(lib.AlpmOptionGetUseSyslog(h.ptr))
+		return lib.AlpmOptionGetUseSyslog(h.ptr)
 	case "alpm_option_get_checkspace":
 		if lib.AlpmOptionGetCheckspace == nil {
 			return 0
 		}
-		return uintptr(lib.AlpmOptionGetCheckspace(h.ptr))
+		return lib.AlpmOptionGetCheckspace(h.ptr)
 	case "alpm_option_get_default_siglevel":
 		if lib.AlpmOptionGetDefaultSigLevel == nil {
 			return 0
 		}
-		return uintptr(lib.AlpmOptionGetDefaultSigLevel(h.ptr))
+		return lib.AlpmOptionGetDefaultSigLevel(h.ptr)
 	case "alpm_option_get_local_file_siglevel":
 		if lib.AlpmOptionGetLocalFileSigLevel == nil {
 			return 0
 		}
-		return uintptr(lib.AlpmOptionGetLocalFileSigLevel(h.ptr))
+		return lib.AlpmOptionGetLocalFileSigLevel(h.ptr)
 	case "alpm_option_get_remote_file_siglevel":
 		if lib.AlpmOptionGetRemoteFileSigLevel == nil {
 			return 0
 		}
-		return uintptr(lib.AlpmOptionGetRemoteFileSigLevel(h.ptr))
+		return lib.AlpmOptionGetRemoteFileSigLevel(h.ptr)
 	case "alpm_option_get_parallel_downloads":
 		if lib.AlpmOptionGetParallelDownloads == nil {
 			return 0
 		}
-		return uintptr(lib.AlpmOptionGetParallelDownloads(h.ptr))
+		return lib.AlpmOptionGetParallelDownloads(h.ptr)
 	default:
 		return 0
 	}
