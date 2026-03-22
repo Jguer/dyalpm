@@ -4,7 +4,7 @@ import (
 	stderrors "errors"
 
 	"github.com/Jguer/dyalpm/internal/lib"
-	"github.com/Jguer/dyalpm/internal/list"
+	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
 
 // TransactionFlag represents transaction flags
@@ -66,7 +66,7 @@ type transaction struct {
 	handle *handle
 }
 
-func (t *transaction) getTransactionList(funcName string, failErr error) (*list.List, error) {
+func (t *transaction) getTransactionList(funcName string, failErr error) (*alpmlist.List, error) {
 	var fn func(uintptr, *uintptr) int32
 	switch funcName {
 	case "alpm_trans_prepare":
@@ -91,7 +91,7 @@ func (t *transaction) getTransactionList(funcName string, failErr error) (*list.
 		return nil, nil
 	}
 
-	alpmList := list.NewList(dataListPtr)
+	alpmList := alpmlist.NewList(dataListPtr)
 	if alpmList == nil {
 		return nil, nil
 	}
@@ -281,7 +281,7 @@ func (t *transaction) getPackageList(funcName string) ([]Package, error) {
 		return []Package{}, nil
 	}
 
-	alpmList := list.NewList(listPtr)
+	alpmList := alpmlist.NewList(listPtr)
 	if alpmList == nil {
 		return []Package{}, nil
 	}

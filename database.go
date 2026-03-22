@@ -6,7 +6,7 @@ import (
 	"unsafe"
 
 	"github.com/Jguer/dyalpm/internal/lib"
-	"github.com/Jguer/dyalpm/internal/list"
+	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
 
 // Usage type for database usage flags
@@ -42,7 +42,7 @@ func newDatabase(ptr uintptr, h *handle) *database {
 	}
 }
 
-func (d *database) getList(funcName string) (*list.List, error) {
+func (d *database) getList(funcName string) (*alpmlist.List, error) {
 	var listPtr uintptr
 	switch funcName {
 	case "alpm_db_get_pkgcache":
@@ -72,7 +72,7 @@ func (d *database) getList(funcName string) (*list.List, error) {
 		return nil, nil
 	}
 
-	return list.NewList(listPtr), nil
+	return alpmlist.NewList(listPtr), nil
 }
 
 func (d *database) getServers(funcName string) []string {
@@ -183,13 +183,13 @@ func (d *database) Search(needles []string) PackageIterator {
 		return PackageIterator{}
 	}
 
-	var alpmList *list.List
+	var alpmList *alpmlist.List
 	var cStrings [][]byte
 
 	for _, s := range needles {
 		cs := lib.CString(s)
 		cStrings = append(cStrings, cs)
-		alpmList = list.Add(alpmList, uintptr(unsafe.Pointer(&cs[0])))
+		alpmList = alpmlist.Add(alpmList, uintptr(unsafe.Pointer(&cs[0])))
 	}
 
 	if alpmList == nil {
@@ -253,7 +253,7 @@ func (d *database) Update(force bool) error {
 	}
 
 	// alpm_db_update expects a list of databases
-	dbList := list.Add(nil, d.ptr)
+	dbList := alpmlist.Add(nil, d.ptr)
 	if dbList == nil {
 		return ErrDatabaseUpdateFailed
 	}
@@ -316,13 +316,13 @@ func (d *database) setServers(funcName string, servers []string) error {
 		return stderrors.New("missing function: " + funcName)
 	}
 
-	var alpmList *list.List
+	var alpmList *alpmlist.List
 	var cStrings [][]byte
 
 	for _, s := range servers {
 		cs := lib.CString(s)
 		cStrings = append(cStrings, cs)
-		alpmList = list.Add(alpmList, uintptr(unsafe.Pointer(&cs[0])))
+		alpmList = alpmlist.Add(alpmList, uintptr(unsafe.Pointer(&cs[0])))
 	}
 	if alpmList != nil {
 		defer alpmList.Free()
@@ -547,7 +547,7 @@ func (g *group) GetPackages() ([]Package, error) {
 		return []Package{}, nil
 	}
 
-	alpmList := list.NewList(packagesPtr)
+	alpmList := alpmlist.NewList(packagesPtr)
 	if alpmList == nil {
 		return []Package{}, nil
 	}

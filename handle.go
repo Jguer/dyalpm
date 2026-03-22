@@ -9,7 +9,7 @@ import (
 
 	"github.com/Jguer/dyalpm/internal/dyerrors"
 	"github.com/Jguer/dyalpm/internal/lib"
-	"github.com/Jguer/dyalpm/internal/list"
+	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
 
 // Handle represents an ALPM handle
@@ -289,7 +289,7 @@ func (h *handle) getSyncDBs() ([]Database, error) {
 	}
 	listPtr := r1
 
-	alpmList := list.NewList(listPtr)
+	alpmList := alpmlist.NewList(listPtr)
 	if alpmList == nil {
 		return []Database{}, nil
 	}
@@ -499,7 +499,7 @@ func (h *handle) FetchPkgURL(url string) (string, error) {
 
 	// alpm_fetch_pkgurl(handle, urls_list, &fetched_list)
 	cURL := lib.CString(url)
-	urlList := list.Add(nil, uintptr(unsafe.Pointer(&cURL[0])))
+	urlList := alpmlist.Add(nil, uintptr(unsafe.Pointer(&cURL[0])))
 	if urlList == nil {
 		return "", stderrors.New("failed to create URL list")
 	}
@@ -517,7 +517,7 @@ func (h *handle) FetchPkgURL(url string) (string, error) {
 		return "", nil
 	}
 
-	fetchedList := list.NewList(fetchedListPtr)
+	fetchedList := alpmlist.NewList(fetchedListPtr)
 	defer fetchedList.Free()
 
 	// Return the first fetched path (since we only requested one URL)

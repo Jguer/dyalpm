@@ -2,7 +2,7 @@ package lib
 
 var (
 	AlpmVersion      func() uintptr
-	AlpmCapabilities func() uintptr
+	AlpmCapabilities func() uint64
 	AlpmErrno        func(handle uintptr) int32
 	AlpmStrerror     func(errno int32) uintptr
 	AlpmRelease      func(handle uintptr) int32
@@ -159,8 +159,8 @@ var (
 	AlpmPkgGetVersion         func(pkg uintptr) uintptr
 	AlpmPkgGetDesc            func(pkg uintptr) uintptr
 	AlpmPkgGetArch            func(pkg uintptr) uintptr
-	AlpmPkgGetSize            func(pkg uintptr) uintptr
-	AlpmPkgGetISize           func(pkg uintptr) uintptr
+	AlpmPkgGetSize            func(pkg uintptr) int64
+	AlpmPkgGetISize           func(pkg uintptr) int64
 	AlpmPkgGetDB              func(pkg uintptr) uintptr
 	AlpmPkgGetDepends         func(pkg uintptr) uintptr
 	AlpmPkgGetConflicts       func(pkg uintptr) uintptr
@@ -178,7 +178,7 @@ var (
 	AlpmPkgGetValidation      func(pkg uintptr) int32
 	AlpmPkgGetURL             func(pkg uintptr) uintptr
 	AlpmPkgHasScriptlet       func(pkg uintptr) int32
-	AlpmPkgDownloadSize       func(pkg uintptr) uintptr
+	AlpmPkgDownloadSize       func(pkg uintptr) int64
 	AlpmPkgGetBackup          func(pkg uintptr) uintptr
 	AlpmPkgGetFiles           func(pkg uintptr) uintptr
 	AlpmPkgGetInstallDate     func(pkg uintptr) int32
@@ -189,7 +189,7 @@ var (
 	AlpmPkgGetSig             func(pkg uintptr, sig *uintptr, sigLen *uintptr) int32
 	AlpmPkgGetBase64Sig       func(pkg uintptr) uintptr
 	AlpmPkgChangelogOpen      func(pkg uintptr) uintptr
-	AlpmPkgChangelogRead      func(buf uintptr, size uintptr, pkg uintptr, fp uintptr) uintptr
+	AlpmPkgChangelogRead      func(buf uintptr, size uintptr, pkg uintptr, fp uintptr) int
 	AlpmPkgChangelogClose     func(pkg uintptr, fp uintptr)
 	AlpmPkgSyncGetNewVersion  func(pkg uintptr, dbList uintptr) uintptr
 	AlpmPkgGetFilesContains   func(fileList uintptr, path string) int32

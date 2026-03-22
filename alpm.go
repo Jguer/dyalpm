@@ -25,11 +25,11 @@ func Capabilities() (CapabilitiesMask, error) {
 	if lib.AlpmCapabilities == nil {
 		return 0, stderrors.New("missing function: alpm_capabilities")
 	}
-	return CapabilitiesMask(clampUintptrToInt(lib.AlpmCapabilities())), nil
+	return CapabilitiesMask(lib.AlpmCapabilities()), nil
 }
 
 // CapabilitiesMask represents the library capabilities bitmask
-type CapabilitiesMask int
+type CapabilitiesMask uint64
 
 const (
 	CapNLS        CapabilitiesMask = 1 << 0

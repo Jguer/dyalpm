@@ -1,4 +1,4 @@
-package list
+package alpmList
 
 import (
 	"testing"

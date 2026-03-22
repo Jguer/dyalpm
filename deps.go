@@ -6,7 +6,7 @@ import (
 
 	"github.com/Jguer/dyalpm/internal/dyerrors"
 	"github.com/Jguer/dyalpm/internal/lib"
-	"github.com/Jguer/dyalpm/internal/list"
+	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
 
 // DepMod represents dependency version comparison mode
@@ -363,22 +363,22 @@ func (h *handle) CheckDeps(pkgs []Package, remPkgs []Package, upgradePkgs []Pack
 		return nil, stderrors.New("missing function: alpm_checkdeps")
 	}
 
-	var pkgList, remPkgList, upgradePkgList *list.List
+	var pkgList, remPkgList, upgradePkgList *alpmlist.List
 	for _, p := range pkgs {
 		pkgImpl, _ := p.(*package_)
-		pkgList = list.Add(pkgList, pkgImpl.ptr)
+		pkgList = alpmlist.Add(pkgList, pkgImpl.ptr)
 	}
 	defer pkgList.Free()
 
 	for _, p := range remPkgs {
 		pkgImpl, _ := p.(*package_)
-		remPkgList = list.Add(remPkgList, pkgImpl.ptr)
+		remPkgList = alpmlist.Add(remPkgList, pkgImpl.ptr)
 	}
 	defer remPkgList.Free()
 
 	for _, p := range upgradePkgs {
 		pkgImpl, _ := p.(*package_)
-		upgradePkgList = list.Add(upgradePkgList, pkgImpl.ptr)
+		upgradePkgList = alpmlist.Add(upgradePkgList, pkgImpl.ptr)
 	}
 	defer upgradePkgList.Free()
 
@@ -391,7 +391,7 @@ func (h *handle) CheckDeps(pkgs []Package, remPkgs []Package, upgradePkgs []Pack
 		return []DepMissing{}, nil
 	}
 
-	resList := list.NewList(r1)
+	resList := alpmlist.NewList(r1)
 	defer resList.Free()
 
 	var missings []DepMissing
@@ -413,10 +413,10 @@ func (h *handle) CheckConflicts(pkgs []Package) ([]Conflict, error) {
 		return nil, stderrors.New("missing function: alpm_checkconflicts")
 	}
 
-	var pkgList *list.List
+	var pkgList *alpmlist.List
 	for _, p := range pkgs {
 		pkgImpl, _ := p.(*package_)
-		pkgList = list.Add(pkgList, pkgImpl.ptr)
+		pkgList = alpmlist.Add(pkgList, pkgImpl.ptr)
 	}
 	defer pkgList.Free()
 
@@ -425,7 +425,7 @@ func (h *handle) CheckConflicts(pkgs []Package) ([]Conflict, error) {
 		return []Conflict{}, nil
 	}
 
-	resList := list.NewList(r1)
+	resList := alpmlist.NewList(r1)
 	defer resList.Free()
 
 	var conflicts []Conflict
@@ -445,12 +445,12 @@ func FindSatisfier(pkgs []Package, depstring string) Package {
 		return nil
 	}
 
-	var pkgList *list.List
+	var pkgList *alpmlist.List
 	var h *handle
 	for _, p := range pkgs {
 		pkgImpl, ok := p.(*package_)
 		if ok {
-			pkgList = list.Add(pkgList, pkgImpl.ptr)
+			pkgList = alpmlist.Add(pkgList, pkgImpl.ptr)
 			if h == nil {
 				h = pkgImpl.handle
 			}
@@ -475,11 +475,11 @@ func (h *handle) FindDBSatisfier(dbs []Database, depstring string) Package {
 		return nil
 	}
 
-	var dbList *list.List
+	var dbList *alpmlist.List
 	for _, db := range dbs {
 		dbImpl, ok := db.(*database)
 		if ok {
-			dbList = list.Add(dbList, dbImpl.ptr)
+			dbList = alpmlist.Add(dbList, dbImpl.ptr)
 		}
 	}
 	defer dbList.Free()

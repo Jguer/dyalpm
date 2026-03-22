@@ -3,19 +3,19 @@ package dyalpm
 import (
 	"sort"
 
-	"github.com/Jguer/dyalpm/internal/list"
+	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
 
 // PackageIterator provides lazy iteration over an ALPM package list.
 type PackageIterator struct {
-	list       *list.List
+	list       *alpmlist.List
 	handle     *handle
 	freeOnDone bool
 }
 
 func newPackageIterator(listPtr uintptr, h *handle, freeOnDone bool) PackageIterator {
 	return PackageIterator{
-		list:       list.NewList(listPtr),
+		list:       alpmlist.NewList(listPtr),
 		handle:     h,
 		freeOnDone: freeOnDone,
 	}

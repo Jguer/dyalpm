@@ -7,7 +7,7 @@ import (
 	"unsafe"
 
 	"github.com/Jguer/dyalpm/internal/lib"
-	"github.com/Jguer/dyalpm/internal/list"
+	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
 
 // Package represents an ALPM package (minimal surface used by yay).
@@ -103,7 +103,7 @@ func (p *package_) Size() int64 {
 	if lib.AlpmPkgGetSize == nil {
 		return 0
 	}
-	return clampUintptrToInt64(lib.AlpmPkgGetSize(p.ptr))
+	return lib.AlpmPkgGetSize(p.ptr)
 }
 
 func (p *package_) ISize() int64 {
@@ -113,7 +113,7 @@ func (p *package_) ISize() int64 {
 	if lib.AlpmPkgGetISize == nil {
 		return 0
 	}
-	return clampUintptrToInt64(lib.AlpmPkgGetISize(p.ptr))
+	return lib.AlpmPkgGetISize(p.ptr)
 }
 
 func (p *package_) DB() Database {
@@ -180,7 +180,7 @@ func (p *package_) getDependencyList(funcName string) ([]Dependency, error) {
 		return []Dependency{}, nil
 	}
 
-	alpmList := list.NewList(listPtr)
+	alpmList := alpmlist.NewList(listPtr)
 	if alpmList == nil {
 		return []Dependency{}, nil
 	}
@@ -205,11 +205,11 @@ func PkgFind(pkgs []Package, name string) Package {
 		return nil
 	}
 
-	var alpmList *list.List
+	var alpmList *alpmlist.List
 	for _, p := range pkgs {
 		pkgImpl, ok := p.(*package_)
 		if ok {
-			alpmList = list.Add(alpmList, pkgImpl.ptr)
+			alpmList = alpmlist.Add(alpmList, pkgImpl.ptr)
 		}
 	}
 	defer alpmList.Free()
@@ -298,7 +298,7 @@ func (p *package_) getStringListWithFree(funcName string, freeList bool) ([]stri
 		return []string{}, nil
 	}
 
-	alpmList := list.NewList(r1)
+	alpmList := alpmlist.NewList(r1)
 	if alpmList == nil {
 		return []string{}, nil
 	}
@@ -364,7 +364,7 @@ func (p *package_) Backup() []Backup {
 		return []Backup{}
 	}
 
-	alpmList := list.NewList(r1)
+	alpmList := alpmlist.NewList(r1)
 	if alpmList == nil {
 		return []Backup{}
 	}
@@ -440,8 +440,8 @@ func (p *package_) Files() []File {
 
 	var files []File
 	filesBase := unsafe.Pointer(filesPtr)
-	for i := 0; i < int(count); i++ {
-		current := unsafe.Add(filesBase, uintptr(i)*structSize)
+	for i := uintptr(0); i < count; i++ {
+		current := unsafe.Add(filesBase, i*structSize)
 
 		namePtr := *(*uintptr)(current)
 		name := lib.PtrToString(namePtr)
@@ -546,7 +546,7 @@ func (p *package_) DownloadSize() int64 {
 		return 0
 	}
 
-	return clampUintptrToInt64(lib.AlpmPkgDownloadSize(p.ptr))
+	return lib.AlpmPkgDownloadSize(p.ptr)
 }
 
 func (p *package_) Free() error {
@@ -743,11 +743,11 @@ func (p *package_) SyncGetNewVersion(dbsSync []Database) Package {
 		return nil
 	}
 
-	var dbList *list.List
+	var dbList *alpmlist.List
 	for _, db := range dbsSync {
 		dbImpl, ok := db.(*database)
 		if ok {
-			dbList = list.Add(dbList, dbImpl.ptr)
+			dbList = alpmlist.Add(dbList, dbImpl.ptr)
 		}
 	}
 	defer dbList.Free()
@@ -779,7 +779,7 @@ func (r *changelogReader) Read(p []byte) (n int, err error) {
 	if res == 0 {
 		return 0, io.EOF
 	}
-	return int(res), nil
+	return res, nil
 }
 
 func (r *changelogReader) Close() error {

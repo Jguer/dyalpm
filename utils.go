@@ -6,10 +6,10 @@ import (
 	"unsafe"
 
 	"github.com/Jguer/dyalpm/internal/lib"
-	"github.com/Jguer/dyalpm/internal/list"
+	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
 
-func collectList[T any](alpmList *list.List, build func(uintptr) T) []T {
+func collectList[T any](alpmList *alpmlist.List, build func(uintptr) T) []T {
 	var items []T
 	for item := alpmList; item != nil && item.Ptr() != 0; item = item.Next() {
 		ptr := item.Data()
@@ -64,11 +64,11 @@ func (h *handle) FindGroupPkgs(dbs []Database, name string) ([]Package, error) {
 		return nil, stderrors.New("missing function: alpm_find_group_pkgs")
 	}
 
-	var dbList *list.List
+	var dbList *alpmlist.List
 	for _, db := range dbs {
 		dbImpl, ok := db.(*database)
 		if ok {
-			dbList = list.Add(dbList, dbImpl.ptr)
+			dbList = alpmlist.Add(dbList, dbImpl.ptr)
 		}
 	}
 	defer dbList.Free()
@@ -79,7 +79,7 @@ func (h *handle) FindGroupPkgs(dbs []Database, name string) ([]Package, error) {
 		return []Package{}, nil
 	}
 
-	resList := list.NewList(r1)
+	resList := alpmlist.NewList(r1)
 	defer resList.Free()
 
 	var pkgs []Package
@@ -120,7 +120,7 @@ func (h *handle) ExtractKeyID(identifier string, sig []byte) ([]string, error) {
 		return []string{}, nil
 	}
 
-	alpmList := list.NewList(keysListPtr)
+	alpmList := alpmlist.NewList(keysListPtr)
 	// We need to free the strings in the list too
 	// alpm_list_free_inner(list, free)
 	// For now, let's just free the list structure and hope the strings are managed or short-lived.

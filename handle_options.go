@@ -7,7 +7,7 @@ import (
 
 	"github.com/Jguer/dyalpm/internal/dyerrors"
 	"github.com/Jguer/dyalpm/internal/lib"
-	"github.com/Jguer/dyalpm/internal/list"
+	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
 
 func (h *handle) SetLogFile(path string) error {
@@ -249,7 +249,7 @@ func (h *handle) AssumeInstalled() ([]Dependency, error) {
 		return []Dependency{}, nil
 	}
 
-	alpmList := list.NewList(r1)
+	alpmList := alpmlist.NewList(r1)
 	if alpmList == nil {
 		return []Dependency{}, nil
 	}
@@ -660,7 +660,7 @@ func (h *handle) getOptionStrList(funcName string) ([]string, error) {
 		return []string{}, nil
 	}
 
-	alpmList := list.NewList(r1)
+	alpmList := alpmlist.NewList(r1)
 	if alpmList == nil {
 		return []string{}, nil
 	}
@@ -717,13 +717,13 @@ func (h *handle) setOptionStrList(funcName string, values []string) error {
 		return errors.New("unsupported function: " + funcName)
 	}
 
-	var alpmList *list.List
+	var alpmList *alpmlist.List
 	var cStrings [][]byte
 
 	for _, v := range values {
 		cS := lib.CString(v)
 		cStrings = append(cStrings, cS)
-		alpmList = list.Add(alpmList, uintptr(unsafe.Pointer(&cS[0])))
+		alpmList = alpmlist.Add(alpmList, uintptr(unsafe.Pointer(&cS[0])))
 	}
 	if alpmList != nil {
 		defer alpmList.Free()
@@ -776,11 +776,11 @@ func (h *handle) setOptionDepList(funcName string, deps []Dependency) error {
 		return errors.New("unsupported function: " + funcName)
 	}
 
-	var alpmList *list.List
+	var alpmList *alpmlist.List
 	for _, d := range deps {
 		depImpl, ok := d.(*dependency)
 		if ok {
-			alpmList = list.Add(alpmList, depImpl.ptr)
+			alpmList = alpmlist.Add(alpmList, depImpl.ptr)
 		}
 	}
 	if alpmList != nil {
