@@ -1,13 +1,12 @@
 name: Build Lint Test (BLT)
 on:
-  push:
+  pull_request:
     branches-ignore:
       - pacman*
     paths-ignore:
       - "example/**"
       - "Dockerfile"
       - "**/builder-image.yml"
-  pull_request:
 
 jobs:
   build:
