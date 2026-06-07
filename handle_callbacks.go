@@ -2,6 +2,7 @@ package dyalpm
 
 import (
 	stderrors "errors"
+	"runtime"
 	"sync"
 	"unsafe"
 
@@ -120,6 +121,11 @@ type QuestionCallback func(q Question)
 // ProgressCallback corresponds to alpm_cb_progress.
 type ProgressCallback func(progress int32, pkg string, percent int, howmany uint64, current uint64)
 
+// LogCallback corresponds to alpm_cb_log. The libalpm callback's final
+// argument is a va_list; it is formatted into msg with vsnprintf before being
+// handed to Go, so the callback receives a plain, ready-to-print string.
+type LogCallback func(level LogLevel, msg string)
+
 type handleCallbackSet struct {
 	mu sync.RWMutex
 
@@ -128,6 +134,7 @@ type handleCallbackSet struct {
 	event    EventCallback
 	question QuestionCallback
 	progress ProgressCallback
+	log      LogCallback
 }
 
 var (
@@ -300,7 +307,16 @@ var (
 	questionCbPtr  uintptr
 	progressCbOnce sync.Once
 	progressCbPtr  uintptr
+	logCbOnce      sync.Once
+	logCbPtr       uintptr
 )
+
+func getLogCbPtr() uintptr {
+	logCbOnce.Do(func() {
+		logCbPtr = purego.NewCallback(logcbTrampoline)
+	})
+	return logCbPtr
+}
 
 func getDlCbPtr() uintptr {
 	dlCbOnce.Do(func() {
@@ -479,6 +495,45 @@ func progresscbTrampoline(_ purego.CDecl, ctx uintptr, progress int32, pkg uintp
 	cb(progress, lib.PtrToString(pkg), int(percent), uint64(howmany), uint64(current))
 }
 
+// logcbTrampoline bridges libalpm's alpm_cb_log. Its final C argument is a
+// va_list, which on every supported platform is passed to the callee as a
+// pointer (an array that decays to a pointer on x86-64 SysV, or a >16-byte
+// struct passed indirectly on arm64 AAPCS64). That same pointer is forwarded
+// verbatim to vsnprintf to format the message, mirroring the C idiom of
+// va_start followed by a v*printf call.
+func logcbTrampoline(_ purego.CDecl, ctx uintptr, level int32, format uintptr, ap uintptr) {
+	callbackSetsMu.RLock()
+	set := callbackSets[ctx]
+	callbackSetsMu.RUnlock()
+	if set == nil {
+		return
+	}
+
+	set.mu.RLock()
+	cb := set.log
+	set.mu.RUnlock()
+	if cb == nil || format == 0 || lib.LibcVsnprintf == nil {
+		return
+	}
+
+	buf := make([]byte, 4096)
+	n := lib.LibcVsnprintf(uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)), format, ap)
+	runtime.KeepAlive(buf)
+	if n <= 0 {
+		return
+	}
+
+	length := int(n)
+	if length > len(buf)-1 { // vsnprintf returns the would-be length on truncation
+		length = len(buf) - 1
+	}
+
+	if level < 0 {
+		return
+	}
+	cb(LogLevel(uint(level)), string(buf[:length]))
+}
+
 func (h *handle) setCallbackFunc(
 	cbPtr uintptr,
 	shouldClear bool,
@@ -553,4 +608,15 @@ func (h *handle) SetProgressCallbackFunc(cb ProgressCallback) error {
 	return h.setCallbackFunc(getProgressCbPtr(), false, func(set *handleCallbackSet) {
 		set.progress = cb
 	}, h.SetProgressCallback)
+}
+
+func (h *handle) SetLogCallbackFunc(cb LogCallback) error {
+	if cb == nil {
+		return h.setCallbackFunc(0, true, func(set *handleCallbackSet) {
+			set.log = nil
+		}, h.SetLogCallback)
+	}
+	return h.setCallbackFunc(getLogCbPtr(), false, func(set *handleCallbackSet) {
+		set.log = cb
+	}, h.SetLogCallback)
 }

@@ -60,6 +60,9 @@ func TestAlpmFuncResolution(t *testing.T) {
 	if LibcFree == nil {
 		t.Error("expected libc free to resolve")
 	}
+	if LibcVsnprintf == nil {
+		t.Error("expected libc vsnprintf to resolve")
+	}
 	if AlpmCapabilities == nil {
 		t.Error("expected alpm_capabilities to resolve")
 	} else {

@@ -140,11 +140,12 @@ type Handle interface {
 
 	// Callbacks (raw pointers)
 	//
-	// NOTE: libalpm's log callback (`alpm_cb_log`) uses a `va_list`, which cannot be
-	// safely bridged to a Go function without a C shim. This wrapper therefore
-	// exposes logcb as raw pointers only.
+	// libalpm's log callback (`alpm_cb_log`) ends in a `va_list`. SetLogCallbackFunc
+	// bridges it to a Go function by forwarding that va_list to vsnprintf to format
+	// the message; the raw pointer accessors below remain available for advanced use.
 	LogCallback() (cb uintptr, ctx uintptr)
 	SetLogCallback(cb uintptr, ctx uintptr) error
+	SetLogCallbackFunc(cb LogCallback) error
 
 	DownloadCallback() (cb uintptr, ctx uintptr)
 	SetDownloadCallback(cb uintptr, ctx uintptr) error
