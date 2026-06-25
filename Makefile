@@ -1,5 +1,3 @@
-export GO111MODULE=on
-
 GO ?= go
 
 SOURCES ?= $(shell find . -name "*.go")

@@ -1,7 +1,6 @@
 FROM quay.io/gmanka/archlinuxarm:base-devel
 LABEL maintainer="Jguer,docker@jguer.space"
 
-ENV GO111MODULE=on
 WORKDIR /app
 
 # asciidoc, doxygen, meson needed for pacman-git

@@ -1,6 +1,6 @@
 version: "2"
 run:
-  go: "1.22"
+  go: "1.26"
 linters:
   default: none
   enable:
@@ -20,6 +20,7 @@ linters:
     - misspell
     - nakedret
     - noctx
+    - modernize
     - nolintlint
     - staticcheck
     - unconvert

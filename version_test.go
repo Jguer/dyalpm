@@ -27,11 +27,13 @@ func TestVerCmp_Basic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := VerCmp(tt.v1, tt.v2)
 			result = normalizeResult(result)
 			if result != tt.expected {
 				t.Errorf("VerCmp(%q, %q) = %d, want %d", tt.v1, tt.v2, result, tt.expected)
 			}
+
 		})
 	}
 }
@@ -53,11 +55,13 @@ func TestVerCmp_Epochs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := VerCmp(tt.v1, tt.v2)
 			result = normalizeResult(result)
 			if result != tt.expected {
 				t.Errorf("VerCmp(%q, %q) = %d, want %d", tt.v1, tt.v2, result, tt.expected)
 			}
+
 		})
 	}
 }
@@ -84,11 +88,13 @@ func TestVerCmp_Alpha(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := VerCmp(tt.v1, tt.v2)
 			result = normalizeResult(result)
 			if result != tt.expected {
 				t.Errorf("VerCmp(%q, %q) = %d, want %d", tt.v1, tt.v2, result, tt.expected)
 			}
+
 		})
 	}
 }
@@ -108,11 +114,13 @@ func TestVerCmp_LeadingZeros(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := VerCmp(tt.v1, tt.v2)
 			result = normalizeResult(result)
 			if result != tt.expected {
 				t.Errorf("VerCmp(%q, %q) = %d, want %d", tt.v1, tt.v2, result, tt.expected)
 			}
+
 		})
 	}
 }
@@ -134,11 +142,13 @@ func TestVerCmp_SpecialCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := VerCmp(tt.v1, tt.v2)
 			result = normalizeResult(result)
 			if result != tt.expected {
 				t.Errorf("VerCmp(%q, %q) = %d, want %d", tt.v1, tt.v2, result, tt.expected)
 			}
+
 		})
 	}
 }
@@ -171,11 +181,13 @@ func TestVerCmp_RealWorldVersions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := VerCmp(tt.v1, tt.v2)
 			result = normalizeResult(result)
 			if result != tt.expected {
 				t.Errorf("VerCmp(%q, %q) = %d, want %d", tt.v1, tt.v2, result, tt.expected)
 			}
+
 		})
 	}
 }
@@ -260,6 +272,7 @@ func TestSplitVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
 			epoch, version, rel := splitVersion(tt.input)
 			if epoch != tt.epoch {
 				t.Errorf("epoch = %q, want %q", epoch, tt.epoch)
@@ -270,6 +283,7 @@ func TestSplitVersion(t *testing.T) {
 			if rel != tt.rel {
 				t.Errorf("rel = %q, want %q", rel, tt.rel)
 			}
+
 		})
 	}
 }
@@ -290,12 +304,14 @@ func TestCompareNumericString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.a+"_"+tt.b, func(t *testing.T) {
+			t.Parallel()
 			result := compareNumericString(tt.a, tt.b)
 			result = normalizeResult(result)
 			if result != tt.expected {
 				t.Errorf("compareNumericString(%q, %q) = %d, want %d",
 					tt.a, tt.b, result, tt.expected)
 			}
+
 		})
 	}
 }
@@ -315,11 +331,13 @@ func TestStripLeadingZeros(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
 			result := stripLeadingZeros(tt.input)
 			if result != tt.expected {
 				t.Errorf("stripLeadingZeros(%q) = %q, want %q",
 					tt.input, result, tt.expected)
 			}
+
 		})
 	}
 }
@@ -378,19 +396,19 @@ func TestIsAlnum(t *testing.T) {
 // Benchmarks
 
 func BenchmarkVerCmp_Simple(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		VerCmp("1.0", "2.0")
 	}
 }
 
 func BenchmarkVerCmp_Complex(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		VerCmp("1:5.15.0.arch1-1", "1:5.15.1.arch1-1")
 	}
 }
 
 func BenchmarkVerCmp_Equal(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		VerCmp("1.2.3.4.5-6", "1.2.3.4.5-6")
 	}
 }

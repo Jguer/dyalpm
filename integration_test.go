@@ -4,6 +4,7 @@ package dyalpm
 
 import (
 	"os"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -55,7 +56,7 @@ func mustInstalledPkg(t *testing.T, h Handle, names ...string) Package {
 
 	localDB := mustLocalDB(t, h)
 
-	candidates := append([]string(nil), names...)
+	candidates := slices.Clone(names)
 	if pkgEnv := os.Getenv(integrationPackageEnv); pkgEnv != "" {
 		for _, name := range strings.Split(pkgEnv, ",") {
 			candidates = append(candidates, strings.TrimSpace(name))

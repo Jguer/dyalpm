@@ -59,7 +59,7 @@ func TestPackageIterator_FindSatisfier_NilList(t *testing.T) {
 	if pkg != nil {
 		t.Errorf("FindSatisfier on nil list returned package: %v", pkg)
 	}
-	if err != ErrPackageNotFound {
+	if !errors.Is(err, ErrPackageNotFound) {
 		t.Errorf("FindSatisfier error = %v, want ErrPackageNotFound", err)
 	}
 }

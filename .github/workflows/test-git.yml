@@ -27,5 +27,7 @@ jobs:
                 git clone https://aur.archlinux.org/pacman-git
                 chown -R github pacman-git
                 su github -c "cd pacman-git; yes | makepkg -si --nocheck"
+      - name: Vulnerability check
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./...
       - name: Run Build and Tests with pacman-git
         run: make test

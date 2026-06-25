@@ -1,7 +1,8 @@
 package dyalpm
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 
 	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
@@ -64,8 +65,8 @@ func (it PackageIterator) FindSatisfier(depstring string) (Package, error) {
 // SortBySize returns packages sorted by install size (descending).
 func (it PackageIterator) SortBySize() []Package {
 	pkgs := it.Collect()
-	sort.Slice(pkgs, func(i, j int) bool {
-		return pkgs[i].ISize() > pkgs[j].ISize()
+	slices.SortFunc(pkgs, func(a, b Package) int {
+		return cmp.Compare(b.ISize(), a.ISize())
 	})
 	return pkgs
 }

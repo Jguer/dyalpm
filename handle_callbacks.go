@@ -97,13 +97,7 @@ const (
 )
 
 func clampIntToInt32(value int) int32 {
-	if value > maxInt32 {
-		return int32(maxInt32)
-	}
-	if value < minInt32 {
-		return int32(minInt32)
-	}
-	return int32(value)
+	return int32(max(minInt32, min(maxInt32, value)))
 }
 
 // SetAnswerInt sets the question's "answer" field. The meaning depends on q.Type.
@@ -297,61 +291,13 @@ func (h *handle) SetProgressCallback(cb uintptr, ctx uintptr) error {
 // --- Go callback helpers (purego.NewCallback + ctx keyed by handle ptr) ---
 
 var (
-	dlCbOnce       sync.Once
-	dlCbPtr        uintptr
-	fetchCbOnce    sync.Once
-	fetchCbPtr     uintptr
-	eventCbOnce    sync.Once
-	eventCbPtr     uintptr
-	questionCbOnce sync.Once
-	questionCbPtr  uintptr
-	progressCbOnce sync.Once
-	progressCbPtr  uintptr
-	logCbOnce      sync.Once
-	logCbPtr       uintptr
+	getDlCbPtr       = sync.OnceValue(func() uintptr { return purego.NewCallback(dlcbTrampoline) })
+	getFetchCbPtr    = sync.OnceValue(func() uintptr { return purego.NewCallback(fetchcbTrampoline) })
+	getEventCbPtr    = sync.OnceValue(func() uintptr { return purego.NewCallback(eventcbTrampoline) })
+	getQuestionCbPtr = sync.OnceValue(func() uintptr { return purego.NewCallback(questioncbTrampoline) })
+	getProgressCbPtr = sync.OnceValue(func() uintptr { return purego.NewCallback(progresscbTrampoline) })
+	getLogCbPtr      = sync.OnceValue(func() uintptr { return purego.NewCallback(logcbTrampoline) })
 )
-
-func getLogCbPtr() uintptr {
-	logCbOnce.Do(func() {
-		logCbPtr = purego.NewCallback(logcbTrampoline)
-	})
-	return logCbPtr
-}
-
-func getDlCbPtr() uintptr {
-	dlCbOnce.Do(func() {
-		dlCbPtr = purego.NewCallback(dlcbTrampoline)
-	})
-	return dlCbPtr
-}
-
-func getFetchCbPtr() uintptr {
-	fetchCbOnce.Do(func() {
-		fetchCbPtr = purego.NewCallback(fetchcbTrampoline)
-	})
-	return fetchCbPtr
-}
-
-func getEventCbPtr() uintptr {
-	eventCbOnce.Do(func() {
-		eventCbPtr = purego.NewCallback(eventcbTrampoline)
-	})
-	return eventCbPtr
-}
-
-func getQuestionCbPtr() uintptr {
-	questionCbOnce.Do(func() {
-		questionCbPtr = purego.NewCallback(questioncbTrampoline)
-	})
-	return questionCbPtr
-}
-
-func getProgressCbPtr() uintptr {
-	progressCbOnce.Do(func() {
-		progressCbPtr = purego.NewCallback(progresscbTrampoline)
-	})
-	return progressCbPtr
-}
 
 // C data structures for download events (matching alpm.h)
 type cDownloadInit struct {

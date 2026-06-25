@@ -1,9 +1,5 @@
 package dyerrors
 
-import (
-	"fmt"
-)
-
 // Errno represents an ALPM error code
 type Errno int
 
@@ -136,7 +132,7 @@ type ALPMError struct {
 
 func (e *ALPMError) Error() string {
 	if e.Msg != "" {
-		return fmt.Sprintf("%s: %s", e.Errno.Error(), e.Msg)
+		return e.Errno.Error() + ": " + e.Msg
 	}
 	return e.Errno.Error()
 }

@@ -284,8 +284,7 @@ func BenchmarkVerCmp_Integration_Go(b *testing.B) {
 		{"1.2.3.4.5-6", "1.2.3.4.5-6"},
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		for _, v := range versions {
 			VerCmp(v.v1, v.v2)
 		}
@@ -304,8 +303,7 @@ func BenchmarkVerCmp_Integration_C(b *testing.B) {
 		{"1.2.3.4.5-6", "1.2.3.4.5-6"},
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		for _, v := range versions {
 			libalpmVercmp(v.v1, v.v2)
 		}
