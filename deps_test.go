@@ -96,7 +96,6 @@ func TestDepend_String_WithVersion(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("Depend.String() = %q, want %q", result, tt.expected)
 			}
-
 		})
 	}
 }
@@ -162,7 +161,6 @@ func TestDepend_String_ComplexVersions(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("Depend.String() = %q, want %q", result, tt.expected)
 			}
-
 		})
 	}
 }

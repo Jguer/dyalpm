@@ -97,7 +97,7 @@ const (
 )
 
 func clampIntToInt32(value int) int32 {
-	return int32(max(minInt32, min(maxInt32, value)))
+	return int32(max(minInt32, min(maxInt32, value))) //nolint:gosec // G115: value is clamped to int32 range
 }
 
 // SetAnswerInt sets the question's "answer" field. The meaning depends on q.Type.
@@ -469,10 +469,9 @@ func logcbTrampoline(_ purego.CDecl, ctx uintptr, level int32, format uintptr, a
 		return
 	}
 
-	length := int(n)
-	if length > len(buf)-1 { // vsnprintf returns the would-be length on truncation
-		length = len(buf) - 1
-	}
+	length := min(int(n),
+		// vsnprintf returns the would-be length on truncation
+		len(buf)-1)
 
 	if level < 0 {
 		return

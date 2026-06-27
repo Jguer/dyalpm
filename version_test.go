@@ -33,7 +33,6 @@ func TestVerCmp_Basic(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("VerCmp(%q, %q) = %d, want %d", tt.v1, tt.v2, result, tt.expected)
 			}
-
 		})
 	}
 }
@@ -61,7 +60,6 @@ func TestVerCmp_Epochs(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("VerCmp(%q, %q) = %d, want %d", tt.v1, tt.v2, result, tt.expected)
 			}
-
 		})
 	}
 }
@@ -94,7 +92,6 @@ func TestVerCmp_Alpha(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("VerCmp(%q, %q) = %d, want %d", tt.v1, tt.v2, result, tt.expected)
 			}
-
 		})
 	}
 }
@@ -120,7 +117,6 @@ func TestVerCmp_LeadingZeros(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("VerCmp(%q, %q) = %d, want %d", tt.v1, tt.v2, result, tt.expected)
 			}
-
 		})
 	}
 }
@@ -148,7 +144,6 @@ func TestVerCmp_SpecialCases(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("VerCmp(%q, %q) = %d, want %d", tt.v1, tt.v2, result, tt.expected)
 			}
-
 		})
 	}
 }
@@ -187,7 +182,6 @@ func TestVerCmp_RealWorldVersions(t *testing.T) {
 			if result != tt.expected {
 				t.Errorf("VerCmp(%q, %q) = %d, want %d", tt.v1, tt.v2, result, tt.expected)
 			}
-
 		})
 	}
 }
@@ -283,7 +277,6 @@ func TestSplitVersion(t *testing.T) {
 			if rel != tt.rel {
 				t.Errorf("rel = %q, want %q", rel, tt.rel)
 			}
-
 		})
 	}
 }
@@ -311,7 +304,6 @@ func TestCompareNumericString(t *testing.T) {
 				t.Errorf("compareNumericString(%q, %q) = %d, want %d",
 					tt.a, tt.b, result, tt.expected)
 			}
-
 		})
 	}
 }
@@ -337,7 +329,6 @@ func TestStripLeadingZeros(t *testing.T) {
 				t.Errorf("stripLeadingZeros(%q) = %q, want %q",
 					tt.input, result, tt.expected)
 			}
-
 		})
 	}
 }

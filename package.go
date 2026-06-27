@@ -440,7 +440,7 @@ func (p *package_) Files() []File {
 
 	var files []File
 	filesBase := unsafe.Pointer(filesPtr)
-	for i := uintptr(0); i < count; i++ {
+	for i := range count {
 		current := unsafe.Add(filesBase, i*structSize)
 
 		namePtr := *(*uintptr)(current)

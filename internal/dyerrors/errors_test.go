@@ -71,7 +71,6 @@ func TestErrno_Error(t *testing.T) {
 			if got != tt.expected {
 				t.Errorf("Errno(%d).Error() = %q, want %q", tt.errno, got, tt.expected)
 			}
-
 		})
 	}
 }
@@ -123,7 +122,6 @@ func TestNewError(t *testing.T) {
 			if got != tt.expected {
 				t.Errorf("ALPMError.Error() = %q, want %q", got, tt.expected)
 			}
-
 		})
 	}
 }

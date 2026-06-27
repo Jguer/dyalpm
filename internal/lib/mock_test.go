@@ -93,9 +93,9 @@ func TestMockRegistry_ConcurrentAccess(t *testing.T) {
 	mock.SetCallResult("concurrent_func", 200)
 
 	done := make(chan bool)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		go func() {
-			for j := 0; j < 100; j++ {
+			for range 100 {
 				_, _ = mock.GetFunc("concurrent_func")
 				_, _ = mock.CallFunc("concurrent_func")
 			}
@@ -103,7 +103,7 @@ func TestMockRegistry_ConcurrentAccess(t *testing.T) {
 		}()
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		<-done
 	}
 
