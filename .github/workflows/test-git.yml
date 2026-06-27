@@ -28,6 +28,6 @@ jobs:
                 chown -R github pacman-git
                 su github -c "cd pacman-git; yes | makepkg -si --nocheck"
       - name: Vulnerability check
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./...
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest && $(go env GOPATH)/bin/govulncheck ./...
       - name: Run Build and Tests with pacman-git
         run: make test
