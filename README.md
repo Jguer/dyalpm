@@ -4,15 +4,15 @@ A Go wrapper for the Arch Linux Package Manager (ALPM) library using [purego](ht
 
 ## Features
 
-- **Lazy Loading**: Functions are loaded and registered only when needed
+- **No cgo**: libalpm is loaded at runtime with purego
 - **Type-Safe Interfaces**: Clean Go interfaces for all ALPM operations
 - **Maintainable Structure**: Well-organized codebase with clear separation of concerns
 - **Error Handling**: Comprehensive error types matching ALPM error codes
 
 ## Requirements
 
-- Go 1.21 or later
-- libalpm.so.15 (Arch Linux package manager library)
+- Go 1.26 or later
+- libalpm.so.16 (pacman 7; falls back to libalpm.so)
 - Linux system with ALPM installed
 
 ## Installation
@@ -89,46 +89,45 @@ if err != nil {
 defer trans.Release()
 
 // Add a package to install
-pkg, _ := syncDB.GetPkg("vim")
+pkg := syncDB.Pkg("vim")
 err = trans.AddPkg(pkg)
 if err != nil {
 	log.Fatal(err)
 }
 
-// Prepare the transaction
+// Prepare the transaction. On failure, missing holds the unsatisfied dependencies.
 missing, err := trans.Prepare()
+for _, dep := range missing {
+	fmt.Printf("  %s requires %s\n", dep.GetTarget(), dep.GetDepend().GetName())
+	dep.Free()
+}
 if err != nil {
 	log.Fatal(err)
 }
 
-if len(missing) > 0 {
-	fmt.Println("Missing dependencies:")
-	for _, dep := range missing {
-		fmt.Printf("  %s requires %s\n", dep.GetTarget(), dep.GetDepend().GetName())
-	}
-}
-
-// Commit the transaction
+// Commit the transaction. On failure, conflicts holds the file conflicts.
 conflicts, err := trans.Commit()
+for _, c := range conflicts {
+	fmt.Printf("  %s: %s\n", c.GetTarget(), c.GetFile())
+	c.Free()
+}
 if err != nil {
 	log.Fatal(err)
-}
-
-if len(conflicts) > 0 {
-	fmt.Println("File conflicts detected!")
 }
 ```
 
-## Lazy Loading
+## Loading
 
-All C functions are loaded lazily - they are only resolved from the library when first needed. This improves startup time and allows the library to work even if some functions are unavailable.
+libalpm is opened on the first `Initialize`, `Version` or `Capabilities` call and all symbols are resolved then. A symbol missing from an older libalpm is left unbound, and the methods that need it return a "missing function" error instead of crashing.
 
 ## Error Handling
 
-Errors are represented using the `errors.Errno` type which matches ALPM's error codes. You can check for specific errors:
+`handle.Errno()` returns the current libalpm error code, and `handle.StrError` turns it into text:
 
 ```go
-if errno := handle.Errno(); errno != errors.ErrOK {
+if errno := handle.Errno(); errno != 0 {
 	fmt.Printf("Error: %s\n", handle.StrError(errno))
 }
 ```
+
+Transaction errors wrap a sentinel such as `alpm.ErrTransactionPrepareFailed` together with the libalpm error code, so `errors.Is(err, alpm.ErrTransactionPrepareFailed)` works.
