@@ -269,15 +269,6 @@ func (c *conflict) GetReason() Dependency {
 	return newDependency(c.field(2))
 }
 
-// toDependList converts a Dependency slice into a Depend slice.
-func toDependList(deps []Dependency) []Depend {
-	result := make([]Depend, len(deps))
-	for i, dep := range deps {
-		result[i] = dep.(*dependency).toDepend()
-	}
-	return result
-}
-
 func (c *conflict) Free() {
 	if c.ptr == 0 {
 		return

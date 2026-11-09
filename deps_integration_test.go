@@ -140,11 +140,8 @@ func TestDependency_WrapperNilSafety(t *testing.T) {
 	}
 	fileConflict.Free()
 
-	// Cover toDependList conversion and alias behavior with empty data.
-	deps := []Dependency{newDependency(0)}
-	got := toDependList(deps)
-	if len(got) != 1 {
-		t.Fatalf("expected toDependList to preserve length 1, got %d", len(got))
+	if got := newDependency(0).toDepend(); got != (Depend{}) {
+		t.Fatalf("expected zero Depend for zero-value dependency, got %+v", got)
 	}
 }
 

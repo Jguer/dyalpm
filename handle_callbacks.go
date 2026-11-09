@@ -165,127 +165,72 @@ func unregisterCallbackSet(key uintptr) {
 
 // --- Raw callback accessors (alpm_option_get_*cb / set_*cb) ---
 
-func (h *handle) getCallbackPair(getName, getCtxName string) (cb uintptr, ctx uintptr) {
-	if h.ptr == 0 {
+func (h *handle) getCallbackPair(getFn, getCtxFn func(uintptr) uintptr) (cb uintptr, ctx uintptr) {
+	if h.ptr == 0 || getFn == nil || getCtxFn == nil {
 		return 0, 0
 	}
-
-	var getFn func(uintptr) uintptr
-	var getCtxFn func(uintptr) uintptr
-	switch getName {
-	case "alpm_option_get_logcb":
-		getFn = lib.AlpmOptionGetLogcb
-	case "alpm_option_get_dlcb":
-		getFn = lib.AlpmOptionGetDlcb
-	case "alpm_option_get_fetchcb":
-		getFn = lib.AlpmOptionGetFetchcb
-	case "alpm_option_get_eventcb":
-		getFn = lib.AlpmOptionGetEventcb
-	case "alpm_option_get_questioncb":
-		getFn = lib.AlpmOptionGetQuestioncb
-	case "alpm_option_get_progresscb":
-		getFn = lib.AlpmOptionGetProgresscb
-	}
-	switch getCtxName {
-	case "alpm_option_get_logcb_ctx":
-		getCtxFn = lib.AlpmOptionGetLogcbCtx
-	case "alpm_option_get_dlcb_ctx":
-		getCtxFn = lib.AlpmOptionGetDlcbCtx
-	case "alpm_option_get_fetchcb_ctx":
-		getCtxFn = lib.AlpmOptionGetFetchcbCtx
-	case "alpm_option_get_eventcb_ctx":
-		getCtxFn = lib.AlpmOptionGetEventcbCtx
-	case "alpm_option_get_questioncb_ctx":
-		getCtxFn = lib.AlpmOptionGetQuestioncbCtx
-	case "alpm_option_get_progresscb_ctx":
-		getCtxFn = lib.AlpmOptionGetProgresscbCtx
-	}
-	if getFn == nil || getCtxFn == nil {
-		return 0, 0
-	}
-
-	cb = getFn(h.ptr)
-	ctx = getCtxFn(h.ptr)
-	return cb, ctx
+	return getFn(h.ptr), getCtxFn(h.ptr)
 }
 
-func (h *handle) setCallback(setName string, cb uintptr, ctx uintptr) error {
+func (h *handle) setCallback(setFn func(uintptr, uintptr, uintptr) int32, name string, cb uintptr, ctx uintptr) error {
 	if h.ptr == 0 {
 		return alpmerrors.ErrHandleNull
 	}
-
-	var setFn func(uintptr, uintptr, uintptr) int32
-	switch setName {
-	case "alpm_option_set_logcb":
-		setFn = lib.AlpmOptionSetLogcb
-	case "alpm_option_set_dlcb":
-		setFn = lib.AlpmOptionSetDlcb
-	case "alpm_option_set_fetchcb":
-		setFn = lib.AlpmOptionSetFetchcb
-	case "alpm_option_set_eventcb":
-		setFn = lib.AlpmOptionSetEventcb
-	case "alpm_option_set_questioncb":
-		setFn = lib.AlpmOptionSetQuestioncb
-	case "alpm_option_set_progresscb":
-		setFn = lib.AlpmOptionSetProgresscb
-	}
 	if setFn == nil {
-		return stderrors.New("missing function: " + setName)
+		return stderrors.New("missing function: " + name)
 	}
-
-	r1 := setFn(h.ptr, cb, ctx)
-	if r1 != 0 {
+	if setFn(h.ptr, cb, ctx) != 0 {
 		return alpmerrors.NewError(h.Errno(), "failed to set callback")
 	}
 	return nil
 }
 
 func (h *handle) LogCallback() (cb uintptr, ctx uintptr) {
-	return h.getCallbackPair("alpm_option_get_logcb", "alpm_option_get_logcb_ctx")
+	return h.getCallbackPair(lib.AlpmOptionGetLogcb, lib.AlpmOptionGetLogcbCtx)
 }
 
 func (h *handle) SetLogCallback(cb uintptr, ctx uintptr) error {
-	return h.setCallback("alpm_option_set_logcb", cb, ctx)
+	return h.setCallback(lib.AlpmOptionSetLogcb, "alpm_option_set_logcb", cb, ctx)
 }
 
 func (h *handle) DownloadCallback() (cb uintptr, ctx uintptr) {
-	return h.getCallbackPair("alpm_option_get_dlcb", "alpm_option_get_dlcb_ctx")
+	return h.getCallbackPair(lib.AlpmOptionGetDlcb, lib.AlpmOptionGetDlcbCtx)
 }
 
 func (h *handle) SetDownloadCallback(cb uintptr, ctx uintptr) error {
-	return h.setCallback("alpm_option_set_dlcb", cb, ctx)
+	return h.setCallback(lib.AlpmOptionSetDlcb, "alpm_option_set_dlcb", cb, ctx)
 }
 
 func (h *handle) FetchCallback() (cb uintptr, ctx uintptr) {
-	return h.getCallbackPair("alpm_option_get_fetchcb", "alpm_option_get_fetchcb_ctx")
+	return h.getCallbackPair(lib.AlpmOptionGetFetchcb, lib.AlpmOptionGetFetchcbCtx)
 }
 
 func (h *handle) SetFetchCallback(cb uintptr, ctx uintptr) error {
-	return h.setCallback("alpm_option_set_fetchcb", cb, ctx)
+	return h.setCallback(lib.AlpmOptionSetFetchcb, "alpm_option_set_fetchcb", cb, ctx)
 }
 
 func (h *handle) EventCallback() (cb uintptr, ctx uintptr) {
-	return h.getCallbackPair("alpm_option_get_eventcb", "alpm_option_get_eventcb_ctx")
+	return h.getCallbackPair(lib.AlpmOptionGetEventcb, lib.AlpmOptionGetEventcbCtx)
 }
 
 func (h *handle) SetEventCallback(cb uintptr, ctx uintptr) error {
-	return h.setCallback("alpm_option_set_eventcb", cb, ctx)
+	return h.setCallback(lib.AlpmOptionSetEventcb, "alpm_option_set_eventcb", cb, ctx)
 }
 
 func (h *handle) QuestionCallback() (cb uintptr, ctx uintptr) {
-	return h.getCallbackPair("alpm_option_get_questioncb", "alpm_option_get_questioncb_ctx")
+	return h.getCallbackPair(lib.AlpmOptionGetQuestioncb, lib.AlpmOptionGetQuestioncbCtx)
 }
 
 func (h *handle) SetQuestionCallback(cb uintptr, ctx uintptr) error {
-	return h.setCallback("alpm_option_set_questioncb", cb, ctx)
+	return h.setCallback(lib.AlpmOptionSetQuestioncb, "alpm_option_set_questioncb", cb, ctx)
 }
 
 func (h *handle) ProgressCallback() (cb uintptr, ctx uintptr) {
-	return h.getCallbackPair("alpm_option_get_progresscb", "alpm_option_get_progresscb_ctx")
+	return h.getCallbackPair(lib.AlpmOptionGetProgresscb, lib.AlpmOptionGetProgresscbCtx)
 }
 
 func (h *handle) SetProgressCallback(cb uintptr, ctx uintptr) error {
-	return h.setCallback("alpm_option_set_progresscb", cb, ctx)
+	return h.setCallback(lib.AlpmOptionSetProgresscb, "alpm_option_set_progresscb", cb, ctx)
 }
 
 // --- Go callback helpers (purego.NewCallback + ctx keyed by handle ptr) ---

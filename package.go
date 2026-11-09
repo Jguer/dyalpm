@@ -132,72 +132,25 @@ func (p *package_) DB() Database {
 }
 
 func (p *package_) Depends() []Depend {
-	deps, _ := p.getDependencyList("alpm_pkg_get_depends")
-	return toDependList(deps)
+	return p.depList(lib.AlpmPkgGetDepends)
 }
 
 func (p *package_) Conflicts() []Depend {
-	deps, _ := p.getDependencyList("alpm_pkg_get_conflicts")
-	return toDependList(deps)
+	return p.depList(lib.AlpmPkgGetConflicts)
 }
 
 func (p *package_) Provides() []Depend {
-	deps, _ := p.getDependencyList("alpm_pkg_get_provides")
-	return toDependList(deps)
+	return p.depList(lib.AlpmPkgGetProvides)
 }
 
-func (p *package_) getDependencyList(funcName string) ([]Dependency, error) {
-	if p.ptr == 0 {
-		return nil, ErrInvalidPackage
+// depList reads a libalpm-owned list of alpm_depend_t.
+func (p *package_) depList(fn func(uintptr) uintptr) []Depend {
+	if p.ptr == 0 || fn == nil {
+		return nil
 	}
-	var getFn func(uintptr) uintptr
-	switch funcName {
-	case "alpm_pkg_get_depends":
-		getFn = lib.AlpmPkgGetDepends
-	case "alpm_pkg_get_conflicts":
-		getFn = lib.AlpmPkgGetConflicts
-	case "alpm_pkg_get_provides":
-		getFn = lib.AlpmPkgGetProvides
-	case "alpm_pkg_get_optdepends":
-		getFn = lib.AlpmPkgGetOptdepends
-	case "alpm_pkg_get_checkdepends":
-		getFn = lib.AlpmPkgGetCheckdepends
-	case "alpm_pkg_get_makedepends":
-		getFn = lib.AlpmPkgGetMakedepends
-	case "alpm_pkg_get_replaces":
-		getFn = lib.AlpmPkgGetReplaces
-	case "alpm_pkg_get_groups":
-		getFn = lib.AlpmPkgGetGroups
-	case "alpm_pkg_get_licenses":
-		getFn = lib.AlpmPkgGetLicenses
-	case "alpm_pkg_get_files":
-		getFn = lib.AlpmPkgGetFiles
-	default:
-		return nil, stderrors.New("missing function: " + funcName)
-	}
-	if getFn == nil {
-		return nil, nil
-	}
-
-	listPtr := getFn(p.ptr)
-	if listPtr == 0 {
-		return []Dependency{}, nil
-	}
-
-	alpmList := alpmlist.NewList(listPtr)
-	if alpmList == nil {
-		return []Dependency{}, nil
-	}
-
-	var deps []Dependency
-	for item := alpmList; item != nil && item.Ptr() != 0; item = item.Next() {
-		depPtr := item.Data()
-		if depPtr != 0 {
-			deps = append(deps, newDependency(depPtr))
-		}
-	}
-
-	return deps, nil
+	return collectList(alpmlist.NewList(fn(p.ptr)), func(ptr uintptr) Depend {
+		return newDependency(ptr).toDepend()
+	})
 }
 
 // PkgFind finds a package in a list by name
@@ -239,85 +192,48 @@ func PkgFind(pkgs []Package, name string) Package {
 }
 
 func (p *package_) CheckDepends() []Depend {
-	deps, _ := p.getDependencyList("alpm_pkg_get_checkdepends")
-	return toDependList(deps)
+	return p.depList(lib.AlpmPkgGetCheckdepends)
 }
 
 func (p *package_) MakeDepends() []Depend {
-	deps, _ := p.getDependencyList("alpm_pkg_get_makedepends")
-	return toDependList(deps)
+	return p.depList(lib.AlpmPkgGetMakedepends)
 }
 
 func (p *package_) OptionalDepends() []Depend {
-	deps, _ := p.getDependencyList("alpm_pkg_get_optdepends")
-	return toDependList(deps)
+	return p.depList(lib.AlpmPkgGetOptdepends)
 }
 
 func (p *package_) Replaces() []Depend {
-	deps, _ := p.getDependencyList("alpm_pkg_get_replaces")
-	return toDependList(deps)
+	return p.depList(lib.AlpmPkgGetReplaces)
 }
 
 func (p *package_) Groups() []string {
-	groups, _ := p.getStringList("alpm_pkg_get_groups")
+	groups, _ := p.stringList(lib.AlpmPkgGetGroups, "alpm_pkg_get_groups", false)
 	return groups
 }
 
 func (p *package_) Licenses() []string {
-	licenses, _ := p.getStringList("alpm_pkg_get_licenses")
+	licenses, _ := p.stringList(lib.AlpmPkgGetLicenses, "alpm_pkg_get_licenses", false)
 	return licenses
 }
 
-func (p *package_) getStringList(funcName string) ([]string, error) {
-	return p.getStringListWithFree(funcName, false)
-}
-
-func (p *package_) getStringListWithFree(funcName string, freeList bool) ([]string, error) {
+// stringList reads a list of C strings. Set owned when the caller must free the list.
+func (p *package_) stringList(fn func(uintptr) uintptr, name string, owned bool) ([]string, error) {
 	if p.ptr == 0 {
 		return nil, ErrInvalidPackage
 	}
-
-	var getter func(uintptr) uintptr
-	switch funcName {
-	case "alpm_pkg_get_groups":
-		getter = lib.AlpmPkgGetGroups
-	case "alpm_pkg_get_licenses":
-		getter = lib.AlpmPkgGetLicenses
-	case "alpm_pkg_get_xdata":
-		getter = lib.AlpmPkgGetXdata
-	case "alpm_pkg_compute_requiredby":
-		getter = lib.AlpmPkgComputeRequiredBy
-	case "alpm_pkg_compute_optionalfor":
-		getter = lib.AlpmPkgComputeOptionalFor
-	default:
-		return nil, stderrors.New("missing function: " + funcName)
+	if fn == nil {
+		return nil, stderrors.New("missing function: " + name)
 	}
 
-	if getter == nil {
-		return nil, stderrors.New("missing function: " + funcName)
-	}
-
-	r1 := getter(p.ptr)
-	if r1 == 0 {
-		return []string{}, nil
-	}
-
-	alpmList := alpmlist.NewList(r1)
-	if alpmList == nil {
-		return []string{}, nil
-	}
-	if freeList {
+	alpmList := alpmlist.NewList(fn(p.ptr))
+	if owned {
 		defer alpmList.Free()
 	}
-
-	var items []string
-	for item := alpmList; item != nil && item.Ptr() != 0; item = item.Next() {
-		strPtr := item.Data()
-		if strPtr != 0 {
-			items = append(items, lib.PtrToString(strPtr))
-		}
+	items := collectList(alpmList, lib.PtrToString)
+	if items == nil {
+		return []string{}, nil
 	}
-
 	return items, nil
 }
 
@@ -576,11 +492,11 @@ func (p *package_) Free() error {
 }
 
 func (p *package_) ComputeRequiredBy() ([]string, error) {
-	return p.getStringListWithFree("alpm_pkg_compute_requiredby", true)
+	return p.stringList(lib.AlpmPkgComputeRequiredBy, "alpm_pkg_compute_requiredby", true)
 }
 
 func (p *package_) ComputeOptionalFor() ([]string, error) {
-	return p.getStringListWithFree("alpm_pkg_compute_optionalfor", true)
+	return p.stringList(lib.AlpmPkgComputeOptionalFor, "alpm_pkg_compute_optionalfor", true)
 }
 
 func (p *package_) ShouldIgnore() bool {
@@ -696,7 +612,7 @@ func (p *package_) XData() []string {
 	}
 
 	// alpm_pkg_get_xdata returns a list owned by the package
-	result, _ := p.getStringList("alpm_pkg_get_xdata")
+	result, _ := p.stringList(lib.AlpmPkgGetXdata, "alpm_pkg_get_xdata", false)
 	return result
 }
 
