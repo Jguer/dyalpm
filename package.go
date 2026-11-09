@@ -628,7 +628,7 @@ func (p *package_) CheckPGPSignature() (SigList, error) {
 		return SigList{}, ErrInvalidPackage
 	}
 
-	return checkPGPSignature(p.ptr, p.handle, "alpm_pkg_check_pgp_signature")
+	return checkPGPSignature(p.ptr, lib.AlpmPkgCheckPGPSignature, "alpm_pkg_check_pgp_signature")
 }
 
 func (p *package_) Sig() ([]byte, error) {
