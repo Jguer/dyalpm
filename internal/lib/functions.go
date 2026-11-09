@@ -42,15 +42,6 @@ func PtrToString(ptr uintptr) string {
 	return string(unsafe.Slice(start, n))
 }
 
-// PtrToStringWithLen converts a C string pointer with known length to Go string
-func PtrToStringWithLen(ptr uintptr, length int) string {
-	if ptr == 0 || length == 0 {
-		return ""
-	}
-	base := unsafe.Pointer(ptr)
-	return unsafe.String((*byte)(base), length)
-}
-
 // BoolToInt converts a Go bool to C int (0 or 1)
 func BoolToInt(b bool) int {
 	if b {
