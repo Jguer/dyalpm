@@ -97,7 +97,7 @@ const (
 )
 
 func clampIntToInt32(value int) int32 {
-	return int32(max(minInt32, min(maxInt32, value))) //nolint:gosec // G115: value is clamped to int32 range
+	return int32(max(minInt32, min(maxInt32, value)))
 }
 
 // SetAnswerInt sets the question's "answer" field. The meaning depends on q.Type.
