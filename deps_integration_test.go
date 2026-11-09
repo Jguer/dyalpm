@@ -4,6 +4,7 @@ package dyalpm
 
 import (
 	"testing"
+	"unsafe"
 )
 
 func TestDependency_ParsingAndComputeString(t *testing.T) {
@@ -144,5 +145,33 @@ func TestDependency_WrapperNilSafety(t *testing.T) {
 	got := toDependList(deps)
 	if len(got) != 1 {
 		t.Fatalf("expected toDependList to preserve length 1, got %d", len(got))
+	}
+}
+
+// Decodes a hand-built alpm_conflict_t so the field offsets are checked against real packages.
+func TestConflict_Layout(t *testing.T) {
+	h := mustInitializeTestHandle(t)
+	localDB := mustLocalDB(t, h)
+	pkg1, pkg2 := localDB.Pkg("pacman"), localDB.Pkg("bash")
+	if pkg1 == nil || pkg2 == nil {
+		t.Skip("pacman and bash must be installed")
+	}
+	reason, err := DepFromString("bash>=5.0")
+	if err != nil {
+		t.Fatalf("DepFromString failed: %v", err)
+	}
+	defer reason.Free()
+
+	raw := [3]uintptr{pkg1.(*package_).ptr, pkg2.(*package_).ptr, reason.(*dependency).ptr}
+	c := newConflict(uintptr(unsafe.Pointer(&raw)))
+
+	if got := c.GetPackage1(); got != "pacman" {
+		t.Errorf("GetPackage1 = %q, want pacman", got)
+	}
+	if got := c.GetPackage2(); got != "bash" {
+		t.Errorf("GetPackage2 = %q, want bash", got)
+	}
+	if got := c.GetReason().GetName(); got != "bash" {
+		t.Errorf("GetReason().GetName() = %q, want bash", got)
 	}
 }

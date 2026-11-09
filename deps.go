@@ -226,32 +226,31 @@ func newConflict(ptr uintptr) *conflict {
 	}
 }
 
+// field returns the i-th pointer of
+// struct _alpm_conflict_t { alpm_pkg_t *package1; alpm_pkg_t *package2; alpm_depend_t *reason; }
+func (c *conflict) field(i uintptr) uintptr {
+	return *(*uintptr)(unsafe.Add(unsafe.Pointer(c.ptr), i*unsafe.Sizeof(uintptr(0))))
+}
+
 func (c *conflict) GetPackage1() string {
 	if c.ptr == 0 {
 		return ""
 	}
-	// struct _alpm_conflict_t { ulong hash1; ulong hash2; char *pkg1; char *pkg2; alpm_depend_t *reason; }
-	base := unsafe.Pointer(c.ptr)
-	pkg1Ptr := *(*uintptr)(unsafe.Add(base, 2*unsafe.Sizeof(uintptr(0))))
-	return lib.PtrToString(pkg1Ptr)
+	return newPackage(c.field(0), nil).Name()
 }
 
 func (c *conflict) GetPackage2() string {
 	if c.ptr == 0 {
 		return ""
 	}
-	base := unsafe.Pointer(c.ptr)
-	pkg2Ptr := *(*uintptr)(unsafe.Add(base, 3*unsafe.Sizeof(uintptr(0))))
-	return lib.PtrToString(pkg2Ptr)
+	return newPackage(c.field(1), nil).Name()
 }
 
 func (c *conflict) GetReason() Dependency {
 	if c.ptr == 0 {
 		return nil
 	}
-	base := unsafe.Pointer(c.ptr)
-	reasonPtr := *(*uintptr)(unsafe.Add(base, 4*unsafe.Sizeof(uintptr(0))))
-	return newDependency(reasonPtr)
+	return newDependency(c.field(2))
 }
 
 // toDependList converts a Dependency slice into a Depend slice.
