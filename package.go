@@ -217,7 +217,7 @@ func (p *package_) Licenses() []string {
 	return licenses
 }
 
-// stringList reads a list of C strings. Set owned when the caller must free the list.
+// stringList reads a list of C strings. Set owned when the caller must free the list and its strings.
 func (p *package_) stringList(fn func(uintptr) uintptr, name string, owned bool) ([]string, error) {
 	if p.ptr == 0 {
 		return nil, ErrInvalidPackage
@@ -228,7 +228,7 @@ func (p *package_) stringList(fn func(uintptr) uintptr, name string, owned bool)
 
 	alpmList := alpmlist.NewList(fn(p.ptr))
 	if owned {
-		defer alpmList.Free()
+		defer freeItems(alpmList, lib.Free)
 	}
 	items := collectList(alpmList, lib.PtrToString)
 	if items == nil {
@@ -569,7 +569,8 @@ func (p *package_) Sig() ([]byte, error) {
 		return nil, nil // No signature or error
 	}
 
-	// Copy the signature bytes to a Go slice
+	// The buffer is malloc'd for us: copy it, then free it.
+	defer lib.Free(sigPtr)
 	sig := make([]byte, sigLen)
 	base := unsafe.Pointer(sigPtr)
 	for i := uintptr(0); i < sigLen; i++ {

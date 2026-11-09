@@ -81,14 +81,6 @@ func (t *transaction) runWithData(fn func(uintptr, *uintptr) int32, name string,
 	return alpmlist.NewList(data), t.handle.Errno(), t.handle.transErr(failErr)
 }
 
-// freeItems frees each item of a libalpm-owned result list, then the list itself.
-func freeItems(l *alpmlist.List, free func(uintptr)) {
-	for item := l; item != nil; item = item.Next() {
-		free(item.Data())
-	}
-	l.Free()
-}
-
 // NewTransaction creates a new transaction for the given handle
 func NewTransaction(h Handle) Transaction {
 	handle := h.(*handle)
