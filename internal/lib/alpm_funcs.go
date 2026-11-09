@@ -9,8 +9,6 @@ var (
 	AlpmStrerror     func(errno int32) uintptr
 	AlpmRelease      func(handle uintptr) int32
 	AlpmInitialize   func(root string, dbpath string, errno *int32) uintptr
-	AlpmGetLocaldb   func(handle uintptr) uintptr
-	AlpmGetSyncdbs   func(handle uintptr) uintptr
 	AlpmGetLocalDB   func(handle uintptr) uintptr
 	AlpmGetSyncDBS   func(handle uintptr) uintptr
 
@@ -205,11 +203,8 @@ var (
 
 	AlpmSiglistCleanup func(siglist unsafe.Pointer) int32
 
-	AlpmListAdd   func(list uintptr, data uintptr) uintptr
-	AlpmListCount func(list uintptr, result *uintptr) int32
-	AlpmListFree  func(list uintptr)
-
-	AlpmSetLockFile func(handle uintptr, path string) int32
+	AlpmListAdd  func(list uintptr, data uintptr) uintptr
+	AlpmListFree func(list uintptr)
 )
 
 func registerAlpmFuncs(library uintptr) {
@@ -218,8 +213,6 @@ func registerAlpmFuncs(library uintptr) {
 	tryRegister(&AlpmErrno, library, "alpm_errno")
 	tryRegister(&AlpmStrerror, library, "alpm_strerror")
 	tryRegister(&AlpmRelease, library, "alpm_release")
-	tryRegister(&AlpmGetLocaldb, library, "alpm_get_localdb")
-	tryRegister(&AlpmGetSyncdbs, library, "alpm_get_syncdbs")
 	tryRegister(&AlpmGetLocalDB, library, "alpm_get_localdb")
 	tryRegister(&AlpmGetSyncDBS, library, "alpm_get_syncdbs")
 	tryRegister(&AlpmInitialize, library, "alpm_initialize")
@@ -414,7 +407,5 @@ func registerAlpmFuncs(library uintptr) {
 
 	tryRegister(&AlpmSiglistCleanup, library, "alpm_siglist_cleanup")
 	tryRegister(&AlpmListAdd, library, "alpm_list_add")
-	tryRegister(&AlpmListCount, library, "alpm_list_count")
 	tryRegister(&AlpmListFree, library, "alpm_list_free")
-	tryRegister(&AlpmSetLockFile, library, "alpm_option_set_lockfile")
 }
