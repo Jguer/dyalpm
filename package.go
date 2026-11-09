@@ -690,6 +690,9 @@ func (r *changelogReader) Read(p []byte) (n int, err error) {
 	if r.fp == 0 {
 		return 0, io.EOF
 	}
+	if len(p) == 0 {
+		return 0, nil
+	}
 
 	if lib.AlpmPkgChangelogRead == nil {
 		return 0, stderrors.New("missing function: alpm_pkg_changelog_read")
