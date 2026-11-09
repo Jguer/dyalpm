@@ -331,7 +331,8 @@ func (f *fileConflict) GetType() FileConflictType {
 		return 0
 	}
 	base := unsafe.Pointer(f.ptr)
-	typeVal := *(*int)(unsafe.Add(base, unsafe.Sizeof(uintptr(0))))
+	// alpm_fileconflicttype_t is a 4-byte enum followed by padding.
+	typeVal := *(*int32)(unsafe.Add(base, unsafe.Sizeof(uintptr(0))))
 	return FileConflictType(typeVal)
 }
 
