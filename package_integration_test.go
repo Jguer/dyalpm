@@ -4,6 +4,8 @@ package dyalpm
 
 import (
 	"io"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/Jguer/dyalpm/internal/lib"
@@ -51,7 +53,11 @@ func TestPackage_MetadataAndFileAccess(t *testing.T) {
 		t.Fatalf("expected package %q to expose provides", pkg.Name())
 	}
 	_ = pkg.OptionalDepends()
-	_ = pkgImpl.XData()
+	// makepkg always records pkgtype in xdata.
+	isPkgtype := func(kv string) bool { return strings.HasPrefix(kv, "pkgtype=") }
+	if xdata := pkgImpl.XData(); len(xdata) > 0 && !slices.ContainsFunc(xdata, isPkgtype) {
+		t.Fatalf("XData = %q, want a pkgtype=... entry", xdata)
+	}
 	_ = pkgImpl.Base()
 
 	files := pkgImpl.Files()
