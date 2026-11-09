@@ -505,7 +505,7 @@ func (d *database) CheckPGPSignature() (SigList, error) {
 		return SigList{}, ErrInvalidDatabase
 	}
 
-	return checkPGPSignature(d.ptr, d.handle, "alpm_db_check_pgp_signature")
+	return checkPGPSignature(d.ptr, lib.AlpmDBCheckPGPSignature, "alpm_db_check_pgp_signature")
 }
 
 // Group represents a package group

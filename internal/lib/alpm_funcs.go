@@ -1,5 +1,7 @@
 package lib
 
+import "unsafe"
+
 var (
 	AlpmVersion      func() uintptr
 	AlpmCapabilities func() uint64
@@ -137,8 +139,8 @@ var (
 	AlpmDBGetValid           func(db uintptr) int32
 	AlpmDBGetSiglevel        func(db uintptr) int32
 	AlpmDBGetHandle          func(db uintptr) uintptr
-	AlpmDBCheckPGPSignature  func(db uintptr, siglist uintptr) int32
-	AlpmPkgCheckPGPSignature func(pkg uintptr, siglist uintptr) int32
+	AlpmDBCheckPGPSignature  func(db uintptr, siglist unsafe.Pointer) int32
+	AlpmPkgCheckPGPSignature func(pkg uintptr, siglist unsafe.Pointer) int32
 
 	AlpmDepComputeString func(dep uintptr) uintptr
 	AlpmDepFromString    func(text string) uintptr
@@ -199,7 +201,7 @@ var (
 	AlpmPkgComputeOptionalFor func(pkg uintptr) uintptr
 	AlpmPkgLoad               func(handle uintptr, filename string, full int32, siglevel int32, pkg *uintptr) int32
 
-	AlpmSiglistCleanup func(listPtr uintptr, handle uintptr) int32
+	AlpmSiglistCleanup func(siglist unsafe.Pointer) int32
 
 	AlpmListAdd   func(list uintptr, data uintptr) uintptr
 	AlpmListCount func(list uintptr, result *uintptr) int32
