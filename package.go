@@ -160,6 +160,10 @@ func (p *package_) getDependencyList(funcName string) ([]Dependency, error) {
 		getFn = lib.AlpmPkgGetProvides
 	case "alpm_pkg_get_optdepends":
 		getFn = lib.AlpmPkgGetOptdepends
+	case "alpm_pkg_get_checkdepends":
+		getFn = lib.AlpmPkgGetCheckdepends
+	case "alpm_pkg_get_makedepends":
+		getFn = lib.AlpmPkgGetMakedepends
 	case "alpm_pkg_get_replaces":
 		getFn = lib.AlpmPkgGetReplaces
 	case "alpm_pkg_get_groups":
