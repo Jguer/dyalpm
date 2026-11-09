@@ -496,18 +496,10 @@ func (h *handle) FetchPkgURL(url string) (string, error) {
 		return "", nil
 	}
 
+	// The fetched paths are strdup'd for us. Return the first (we asked for one URL).
 	fetchedList := alpmlist.NewList(fetchedListPtr)
-	defer fetchedList.Free()
-
-	// Return the first fetched path (since we only requested one URL)
-	if fetchedList.Ptr() != 0 {
-		ptr := fetchedList.Data()
-		if ptr != 0 {
-			return lib.PtrToString(ptr), nil
-		}
-	}
-
-	return "", nil
+	defer freeItems(fetchedList, lib.Free)
+	return lib.PtrToString(fetchedList.Data()), nil
 }
 
 func (h *handle) InterruptTransaction() error {

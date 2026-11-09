@@ -20,6 +20,14 @@ func collectList[T any](alpmList *alpmlist.List, build func(uintptr) T) []T {
 	return items
 }
 
+// freeItems frees each item of a caller-owned list, then the list itself.
+func freeItems(l *alpmlist.List, free func(uintptr)) {
+	for item := l; item != nil; item = item.Next() {
+		free(item.Data())
+	}
+	l.Free()
+}
+
 func computeFileSum(fn func(string) uintptr, filename string) (string, error) {
 	if fn == nil {
 		return "", ErrInvalidPackage
@@ -107,20 +115,8 @@ func (h *handle) ExtractKeyID(identifier string, sig []byte) ([]string, error) {
 		return []string{}, nil
 	}
 
+	// The key IDs are strdup'd for us: copy them out, then free strings and list.
 	alpmList := alpmlist.NewList(keysListPtr)
-	// We need to free the strings in the list too
-	// alpm_list_free_inner(list, free)
-	// For now, let's just free the list structure and hope the strings are managed or short-lived.
-	// Actually, alpm_list_free just frees the nodes.
-	defer alpmList.Free()
-
-	var keys []string
-	for item := alpmList; item != nil && item.Ptr() != 0; item = item.Next() {
-		ptr := item.Data()
-		if ptr != 0 {
-			keys = append(keys, lib.PtrToString(ptr))
-		}
-	}
-
-	return keys, nil
+	defer freeItems(alpmList, lib.Free)
+	return collectList(alpmList, lib.PtrToString), nil
 }
