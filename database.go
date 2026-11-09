@@ -167,7 +167,7 @@ func (d *database) PkgCache() PackageIterator {
 		return PackageIterator{}
 	}
 
-	return newPackageIterator(listPtr, d.handle, false)
+	return newPackageIterator(listPtr, d.handle)
 }
 
 func (d *database) Search(needles []string) PackageIterator {
@@ -206,8 +206,10 @@ func (d *database) Search(needles []string) PackageIterator {
 		return PackageIterator{}
 	}
 
-	// alpm_db_search returns a list that must be freed by the caller.
-	return newPackageIterator(resultListPtr, d.handle, true)
+	// The caller owns the result list: copy it out and free it once, here.
+	resultList := alpmlist.NewList(resultListPtr)
+	defer resultList.Free()
+	return PackageIterator{pkgs: newPackageIterator(resultListPtr, d.handle).Collect(), handle: d.handle}
 }
 
 func (d *database) GetGroup(name string) (Group, error) {

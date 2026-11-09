@@ -7,29 +7,28 @@ import (
 	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
 
-// PackageIterator provides lazy iteration over an ALPM package list.
+// PackageIterator provides lazy iteration over a libalpm-owned package list,
+// or over an already collected slice. It can be iterated any number of times.
 type PackageIterator struct {
-	list       *alpmlist.List
-	handle     *handle
-	freeOnDone bool
+	list   *alpmlist.List
+	pkgs   []Package
+	handle *handle
 }
 
-func newPackageIterator(listPtr uintptr, h *handle, freeOnDone bool) PackageIterator {
+// newPackageIterator wraps a list owned by libalpm; the iterator never frees it.
+func newPackageIterator(listPtr uintptr, h *handle) PackageIterator {
 	return PackageIterator{
-		list:       alpmlist.NewList(listPtr),
-		handle:     h,
-		freeOnDone: freeOnDone,
+		list:   alpmlist.NewList(listPtr),
+		handle: h,
 	}
 }
 
-// ForEach iterates over packages lazily. If the underlying list must be freed,
-// it will be freed after iteration.
+// ForEach iterates over the packages.
 func (it PackageIterator) ForEach(fn func(Package) error) error {
-	if it.list == nil {
-		return nil
-	}
-	if it.freeOnDone {
-		defer it.list.Free()
+	for _, pkg := range it.pkgs {
+		if err := fn(pkg); err != nil {
+			return err
+		}
 	}
 	for item := it.list; item != nil && item.Ptr() != 0; item = item.Next() {
 		pkgPtr := item.Data()

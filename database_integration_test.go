@@ -31,7 +31,11 @@ func TestDatabase_LocalDBAndSearchQueries(t *testing.T) {
 		t.Fatalf("expected local package cache to contain %q", pkg.Name())
 	}
 
-	searchResults := localDB.Search([]string{pkg.Name()}).Collect()
+	search := localDB.Search([]string{pkg.Name()})
+	searchResults := search.Collect()
+	if again := search.Collect(); len(again) != len(searchResults) {
+		t.Fatalf("second walk of search results = %d, want %d", len(again), len(searchResults))
+	}
 	var searchMatch bool
 	for _, found := range searchResults {
 		if found != nil && found.Name() == pkg.Name() {

@@ -107,7 +107,7 @@ func TestPackageIterator_ZeroValue(t *testing.T) {
 
 // Test newPackageIterator construction
 func TestNewPackageIterator_ZeroPtr(t *testing.T) {
-	it := newPackageIterator(0, nil, false)
+	it := newPackageIterator(0, nil)
 
 	// With zero pointer, list.NewList returns nil
 	if it.list != nil {
@@ -116,15 +116,15 @@ func TestNewPackageIterator_ZeroPtr(t *testing.T) {
 	if it.handle != nil {
 		t.Error("expected nil handle")
 	}
-	if it.freeOnDone {
-		t.Error("expected freeOnDone=false")
-	}
 }
 
-func TestNewPackageIterator_FreeOnDone(t *testing.T) {
-	it := newPackageIterator(0, nil, true)
-
-	if !it.freeOnDone {
-		t.Error("expected freeOnDone=true")
+// A slice-backed iterator (as returned by Search) must survive repeated walks.
+func TestPackageIterator_SliceRepeatable(t *testing.T) {
+	it := PackageIterator{pkgs: []Package{newPackage(0, nil), newPackage(0, nil)}}
+	if n := len(it.Collect()); n != 2 {
+		t.Fatalf("first Collect = %d, want 2", n)
+	}
+	if n := len(it.Collect()); n != 2 {
+		t.Fatalf("second Collect = %d, want 2", n)
 	}
 }

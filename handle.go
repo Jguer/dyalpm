@@ -406,7 +406,7 @@ func (h *handle) TransGetAdd() PackageIterator {
 		return PackageIterator{}
 	}
 
-	return newPackageIterator(listPtr, h, false)
+	return newPackageIterator(listPtr, h)
 }
 
 func (h *handle) RegisterSyncDB(name string, siglevel int) (Database, error) {
