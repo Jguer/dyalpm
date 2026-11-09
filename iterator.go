@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"slices"
 
+	"github.com/Jguer/dyalpm/internal/lib"
 	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
 
@@ -54,7 +55,15 @@ func (it PackageIterator) Collect() []Package {
 
 // FindSatisfier finds the first package satisfying a depstring.
 func (it PackageIterator) FindSatisfier(depstring string) (Package, error) {
-	pkg := FindSatisfier(it.Collect(), depstring)
+	var pkg Package
+	if it.list != nil && lib.AlpmFindSatisfier != nil {
+		// Hand libalpm its own list instead of copying it into Go and back.
+		if ptr := lib.AlpmFindSatisfier(it.list.Ptr(), depstring); ptr != 0 {
+			pkg = newPackage(ptr, it.handle)
+		}
+	} else if p := FindSatisfier(it.pkgs, depstring); p != nil {
+		pkg = p
+	}
 	if pkg == nil {
 		return nil, ErrPackageNotFound
 	}
