@@ -87,8 +87,7 @@ func (qp *QuestionSelectProvider) Providers(h Handle) PackageIterator {
 	if listPtr == 0 {
 		return PackageIterator{}
 	}
-	// The list belongs to libalpm, so never free it here.
-	return newPackageIterator(listPtr, hImpl, false)
+	return newPackageIterator(listPtr, hImpl)
 }
 
 // SetUseIndex sets which provider to use (0-based index into Providers).
