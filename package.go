@@ -571,13 +571,7 @@ func (p *package_) Sig() ([]byte, error) {
 
 	// The buffer is malloc'd for us: copy it, then free it.
 	defer lib.Free(sigPtr)
-	sig := make([]byte, sigLen)
-	base := unsafe.Pointer(sigPtr)
-	for i := uintptr(0); i < sigLen; i++ {
-		sig[i] = *(*byte)(unsafe.Add(base, i))
-	}
-
-	return sig, nil
+	return append([]byte(nil), unsafe.Slice((*byte)(unsafe.Pointer(sigPtr)), sigLen)...), nil
 }
 
 // Base64Sig returns the base64-encoded package signature.
