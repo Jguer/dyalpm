@@ -606,9 +606,15 @@ func (p *package_) XData() []string {
 		return nil
 	}
 
-	// alpm_pkg_get_xdata returns a list owned by the package
-	result, _ := p.stringList(lib.AlpmPkgGetXdata, "alpm_pkg_get_xdata", false)
-	return result
+	if lib.AlpmPkgGetXdata == nil {
+		return nil
+	}
+
+	// Items are alpm_pkg_xdata_t { char *name; char *value; }, returned as "name=value".
+	return collectList(alpmlist.NewList(lib.AlpmPkgGetXdata(p.ptr)), func(ptr uintptr) string {
+		kv := (*[2]uintptr)(unsafe.Pointer(ptr))
+		return lib.PtrToString(kv[0]) + "=" + lib.PtrToString(kv[1])
+	})
 }
 
 func (p *package_) Contains(path string) bool {
