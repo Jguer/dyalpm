@@ -418,7 +418,7 @@ func (p *package_) BuildDate() time.Time {
 	if lib.AlpmPkgGetBuildDate == nil {
 		return time.Time{}
 	}
-	return toTime(int64(lib.AlpmPkgGetBuildDate(p.ptr)))
+	return toTime(lib.AlpmPkgGetBuildDate(p.ptr))
 }
 
 func (p *package_) InstallDate() time.Time {
@@ -429,7 +429,7 @@ func (p *package_) InstallDate() time.Time {
 	if lib.AlpmPkgGetInstallDate == nil {
 		return time.Time{}
 	}
-	return toTime(int64(lib.AlpmPkgGetInstallDate(p.ptr)))
+	return toTime(lib.AlpmPkgGetInstallDate(p.ptr))
 }
 
 func (p *package_) Reason() PkgReason {

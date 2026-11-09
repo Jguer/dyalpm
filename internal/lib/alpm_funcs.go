@@ -183,8 +183,8 @@ var (
 	AlpmPkgDownloadSize       func(pkg uintptr) int64
 	AlpmPkgGetBackup          func(pkg uintptr) uintptr
 	AlpmPkgGetFiles           func(pkg uintptr) uintptr
-	AlpmPkgGetInstallDate     func(pkg uintptr) int32
-	AlpmPkgGetBuildDate       func(pkg uintptr) int32
+	AlpmPkgGetInstallDate     func(pkg uintptr) int64
+	AlpmPkgGetBuildDate       func(pkg uintptr) int64
 	AlpmPkgGetHandle          func(pkg uintptr) uintptr
 	AlpmPkgShouldIgnore       func(handle uintptr, pkg uintptr) int32
 	AlpmPkgCheckmd5sum        func(pkg uintptr) int32
