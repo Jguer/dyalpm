@@ -2,6 +2,7 @@ package dyalpm
 
 import (
 	stderrors "errors"
+	"unsafe"
 )
 
 // LogLevel represents logging level
@@ -14,6 +15,17 @@ const (
 	LogFunc    LogLevel = 1 << 3
 )
 
+// Question types (alpm_question_type_t). Match these against Question.Type.
+const (
+	QuestionTypeInstallIgnorepkg int32 = 1 << iota
+	QuestionTypeReplacePkg
+	QuestionTypeConflictPkg
+	QuestionTypeCorruptedPkg
+	QuestionTypeRemovePkgs
+	QuestionTypeSelectProvider
+	QuestionTypeImportKey
+)
+
 // QuestionAny is a wrapper for question callback data (go-alpm/v2 compatibility)
 type QuestionAny struct {
 	Question Question
@@ -21,17 +33,16 @@ type QuestionAny struct {
 
 // QuestionInstallIgnorepkg returns a QuestionInstallIgnorepkg if this is an install-ignorepkg question
 func (qa QuestionAny) QuestionInstallIgnorepkg() (*QuestionInstallIgnorepkg, error) {
-	// Question type 1 = install ignorepkg
-	if qa.Question.Type == 1 {
+	if qa.Question.Type == QuestionTypeInstallIgnorepkg {
 		return &QuestionInstallIgnorepkg{q: qa.Question}, nil
 	}
 	return nil, stderrors.New("not an install ignorepkg question")
 }
 
-// QuestionSelectProvider returns a QuestionSelectProvider if this is a select-provider question
+// QuestionSelectProvider returns a QuestionSelectProvider if this is a select-provider question.
+// The library only decodes the question; choosing a provider is up to the application.
 func (qa QuestionAny) QuestionSelectProvider() (*QuestionSelectProvider, error) {
-	// Question type 4 = select provider
-	if qa.Question.Type == 4 {
+	if qa.Question.Type == QuestionTypeSelectProvider {
 		return &QuestionSelectProvider{q: qa.Question}, nil
 	}
 	return nil, stderrors.New("not a select provider question")
@@ -51,25 +62,36 @@ func (qi *QuestionInstallIgnorepkg) SetInstall(install bool) {
 	qi.q.SetAnswerInt(answer)
 }
 
-// QuestionSelectProvider is for handling select-provider questions
+// QuestionSelectProvider is for handling select-provider questions.
+// It mirrors alpm_question_select_provider_t { type; use_index; alpm_list_t *providers; alpm_depend_t *depend; }.
 type QuestionSelectProvider struct {
 	q Question
 }
 
-// Dep returns the dependency string being resolved
+func (qp *QuestionSelectProvider) field(offset uintptr) uintptr {
+	if qp.q.Ptr == 0 {
+		return 0
+	}
+	return *(*uintptr)(unsafe.Add(unsafe.Pointer(qp.q.Ptr), offset))
+}
+
+// Dep returns the dependency string being resolved, e.g. "java-runtime>=17".
 func (qp *QuestionSelectProvider) Dep() string {
-	// TODO: implement proper extraction from question struct
-	return ""
+	return newDependency(qp.field(16)).ComputeString()
 }
 
-// Providers returns the list of provider packages
+// Providers returns the candidate packages, in the order SetUseIndex refers to.
 func (qp *QuestionSelectProvider) Providers(h Handle) PackageIterator {
-	// TODO: implement proper extraction from question struct
-	_ = h
-	return PackageIterator{}
+	hImpl, _ := h.(*handle)
+	listPtr := qp.field(8)
+	if listPtr == 0 {
+		return PackageIterator{}
+	}
+	// The list belongs to libalpm, so never free it here.
+	return newPackageIterator(listPtr, hImpl, false)
 }
 
-// SetUseIndex sets which provider index to use (1-based)
+// SetUseIndex sets which provider to use (0-based index into Providers).
 func (qp *QuestionSelectProvider) SetUseIndex(index int) {
 	qp.q.SetAnswerInt(index)
 }
