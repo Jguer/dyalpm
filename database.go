@@ -42,52 +42,23 @@ func newDatabase(ptr uintptr, h *handle) *database {
 	}
 }
 
-func (d *database) getList(funcName string) (*alpmlist.List, error) {
-	var listPtr uintptr
-	switch funcName {
-	case "alpm_db_get_pkgcache":
-		if lib.AlpmDBGetPkgcache == nil {
-			return nil, stderrors.New("missing function: alpm_db_get_pkgcache")
-		}
-		listPtr = lib.AlpmDBGetPkgcache(d.ptr)
-	case "alpm_db_get_groupcache":
-		if lib.AlpmDBGetGroupcache == nil {
-			return nil, stderrors.New("missing function: alpm_db_get_groupcache")
-		}
-		listPtr = lib.AlpmDBGetGroupcache(d.ptr)
-	case "alpm_db_get_servers":
-		if lib.AlpmDBGetServers == nil {
-			return nil, stderrors.New("missing function: alpm_db_get_servers")
-		}
-		listPtr = lib.AlpmDBGetServers(d.ptr)
-	case "alpm_db_get_cache_servers":
-		if lib.AlpmDBGetCacheServers == nil {
-			return nil, stderrors.New("missing function: alpm_db_get_cache_servers")
-		}
-		listPtr = lib.AlpmDBGetCacheServers(d.ptr)
-	default:
-		return nil, stderrors.New("missing function: " + funcName)
+// list returns the libalpm-owned list from fn, or an error if fn is not bound.
+func (d *database) list(fn func(uintptr) uintptr, name string) (*alpmlist.List, error) {
+	if fn == nil {
+		return nil, stderrors.New("missing function: " + name)
 	}
-	if listPtr == 0 {
-		return nil, nil
-	}
-
-	return alpmlist.NewList(listPtr), nil
+	return alpmlist.NewList(fn(d.ptr)), nil
 }
 
-func (d *database) getServers(funcName string) []string {
+func (d *database) getServers(fn func(uintptr) uintptr, name string) []string {
 	if d.ptr == 0 {
 		return nil
 	}
-
-	listPtr, err := d.getList(funcName)
-	if err != nil || listPtr == nil {
+	l, err := d.list(fn, name)
+	if err != nil {
 		return nil
 	}
-
-	return collectList(listPtr, func(ptr uintptr) string {
-		return lib.PtrToString(ptr)
-	})
+	return collectList(l, lib.PtrToString)
 }
 
 func (d *database) GetName() string {
@@ -125,16 +96,14 @@ func (d *database) GetPkgCache() ([]Package, error) {
 		return nil, ErrInvalidDatabase
 	}
 
-	alpmList, err := d.getList("alpm_db_get_pkgcache")
+	alpmList, err := d.list(lib.AlpmDBGetPkgcache, "alpm_db_get_pkgcache")
 	if err != nil || alpmList == nil {
 		return []Package{}, err
 	}
 
-	pkgs := collectList(alpmList, func(ptr uintptr) Package {
+	return collectList(alpmList, func(ptr uintptr) Package {
 		return newPackage(ptr, d.handle)
-	})
-
-	return pkgs, nil
+	}), nil
 }
 
 // go-alpm/v2 compatible methods
@@ -183,24 +152,12 @@ func (d *database) Search(needles []string) PackageIterator {
 		return PackageIterator{}
 	}
 
-	var alpmList *alpmlist.List
-	var cStrings [][]byte
-
-	for _, s := range needles {
-		cs := lib.CString(s)
-		cStrings = append(cStrings, cs)
-		alpmList = alpmlist.Add(alpmList, uintptr(unsafe.Pointer(&cs[0])))
-	}
-
-	if alpmList == nil {
-		return PackageIterator{}
-	}
+	alpmList, bufs := cStringList(needles)
 	defer alpmList.Free()
 
 	var resultListPtr uintptr
-	ret := int(lib.AlpmDBSearch(d.ptr, alpmList.Ptr(), &resultListPtr))
-	runtime.KeepAlive(cStrings)
-	runtime.KeepAlive(alpmList)
+	ret := lib.AlpmDBSearch(d.ptr, alpmList.Ptr(), &resultListPtr)
+	runtime.KeepAlive(bufs)
 
 	if ret != 0 || resultListPtr == 0 {
 		return PackageIterator{}
@@ -233,7 +190,7 @@ func (d *database) GetGroupCache() ([]Group, error) {
 		return nil, ErrInvalidDatabase
 	}
 
-	alpmList, err := d.getList("alpm_db_get_groupcache")
+	alpmList, err := d.list(lib.AlpmDBGetGroupcache, "alpm_db_get_groupcache")
 	if err != nil || alpmList == nil {
 		return []Group{}, err
 	}
@@ -292,135 +249,68 @@ func (d *database) Unregister() error {
 }
 
 func (d *database) GetServers() []string {
-	return d.getServers("alpm_db_get_servers")
+	return d.getServers(lib.AlpmDBGetServers, "alpm_db_get_servers")
 }
 
 func (d *database) SetServers(servers []string) error {
-	return d.setServers("alpm_db_set_servers", servers)
+	return d.setServers(lib.AlpmDBSetServers, "alpm_db_set_servers", servers)
 }
 
-func (d *database) setServers(funcName string, servers []string) error {
+func (d *database) setServers(fn func(uintptr, uintptr) int32, name string, servers []string) error {
 	if d.ptr == 0 {
 		return ErrInvalidDatabase
 	}
-
-	var setServersFn func(uintptr, uintptr) int32
-	switch funcName {
-	case "alpm_db_set_servers":
-		setServersFn = lib.AlpmDBSetServers
-	case "alpm_db_set_cache_servers":
-		setServersFn = lib.AlpmDBSetCacheServers
-	default:
-		return stderrors.New("missing function: " + funcName)
+	if fn == nil {
+		return stderrors.New("missing function: " + name)
 	}
 
-	if setServersFn == nil {
-		return stderrors.New("missing function: " + funcName)
-	}
+	alpmList, bufs := cStringList(servers)
+	defer alpmList.Free()
 
-	var alpmList *alpmlist.List
-	var cStrings [][]byte
-
-	for _, s := range servers {
-		cs := lib.CString(s)
-		cStrings = append(cStrings, cs)
-		alpmList = alpmlist.Add(alpmList, uintptr(unsafe.Pointer(&cs[0])))
-	}
-	if alpmList != nil {
-		defer alpmList.Free()
-	}
-
-	result := setServersFn(d.ptr, alpmList.Ptr())
-
-	// Keep strings alive during the call
-	runtime.KeepAlive(cStrings)
-	runtime.KeepAlive(alpmList)
+	result := fn(d.ptr, alpmList.Ptr())
+	runtime.KeepAlive(bufs)
 
 	if result != 0 {
 		return ErrDatabaseUpdateFailed
 	}
+	return nil
+}
 
+func (d *database) serverOp(fn func(uintptr, string) int32, name, url string) error {
+	if d.ptr == 0 {
+		return ErrInvalidDatabase
+	}
+	if fn == nil {
+		return stderrors.New("missing function: " + name)
+	}
+	if fn(d.ptr, url) != 0 {
+		return ErrDatabaseUpdateFailed
+	}
 	return nil
 }
 
 func (d *database) AddServer(url string) error {
-	if d.ptr == 0 {
-		return ErrInvalidDatabase
-	}
-
-	if lib.AlpmDBAddServer == nil {
-		return stderrors.New("missing function: alpm_db_add_server")
-	}
-
-	result := lib.AlpmDBAddServer(d.ptr, url)
-
-	if result != 0 {
-		return ErrDatabaseUpdateFailed
-	}
-
-	return nil
+	return d.serverOp(lib.AlpmDBAddServer, "alpm_db_add_server", url)
 }
 
 func (d *database) RemoveServer(url string) error {
-	if d.ptr == 0 {
-		return ErrInvalidDatabase
-	}
-
-	if lib.AlpmDBRemoveServer == nil {
-		return stderrors.New("missing function: alpm_db_remove_server")
-	}
-
-	result := lib.AlpmDBRemoveServer(d.ptr, url)
-
-	if result != 0 {
-		return ErrDatabaseUpdateFailed
-	}
-
-	return nil
+	return d.serverOp(lib.AlpmDBRemoveServer, "alpm_db_remove_server", url)
 }
 
 func (d *database) GetCacheServers() []string {
-	return d.getServers("alpm_db_get_cache_servers")
+	return d.getServers(lib.AlpmDBGetCacheServers, "alpm_db_get_cache_servers")
 }
 
 func (d *database) SetCacheServers(servers []string) error {
-	return d.setServers("alpm_db_set_cache_servers", servers)
+	return d.setServers(lib.AlpmDBSetCacheServers, "alpm_db_set_cache_servers", servers)
 }
 
 func (d *database) AddCacheServer(url string) error {
-	if d.ptr == 0 {
-		return ErrInvalidDatabase
-	}
-
-	if lib.AlpmDBAddCacheServer == nil {
-		return stderrors.New("missing function: alpm_db_add_cache_server")
-	}
-
-	result := lib.AlpmDBAddCacheServer(d.ptr, url)
-
-	if result != 0 {
-		return ErrDatabaseUpdateFailed
-	}
-
-	return nil
+	return d.serverOp(lib.AlpmDBAddCacheServer, "alpm_db_add_cache_server", url)
 }
 
 func (d *database) RemoveCacheServer(url string) error {
-	if d.ptr == 0 {
-		return ErrInvalidDatabase
-	}
-
-	if lib.AlpmDBRemoveCacheServer == nil {
-		return stderrors.New("missing function: alpm_db_remove_cache_server")
-	}
-
-	result := lib.AlpmDBRemoveCacheServer(d.ptr, url)
-
-	if result != 0 {
-		return ErrDatabaseUpdateFailed
-	}
-
-	return nil
+	return d.serverOp(lib.AlpmDBRemoveCacheServer, "alpm_db_remove_cache_server", url)
 }
 
 func (d *database) SetUsage(usage int) error {

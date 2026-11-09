@@ -20,27 +20,14 @@ func collectList[T any](alpmList *alpmlist.List, build func(uintptr) T) []T {
 	return items
 }
 
-func computeFileSum(funcName, filename string) (string, error) {
-	var r1 uintptr
-	switch funcName {
-	case "alpm_compute_md5sum":
-		if lib.AlpmComputeMd5sum == nil {
-			return "", ErrInvalidPackage
-		}
-		r1 = lib.AlpmComputeMd5sum(filename)
-	case "alpm_compute_sha256sum":
-		if lib.AlpmComputeSha256sum == nil {
-			return "", ErrInvalidPackage
-		}
-		r1 = lib.AlpmComputeSha256sum(filename)
-	default:
+func computeFileSum(fn func(string) uintptr, filename string) (string, error) {
+	if fn == nil {
 		return "", ErrInvalidPackage
 	}
-
+	r1 := fn(filename)
 	if r1 == 0 {
 		return "", ErrInvalidPackage
 	}
-
 	res := lib.PtrToString(r1)
 	lib.Free(r1)
 	return res, nil
@@ -48,12 +35,12 @@ func computeFileSum(funcName, filename string) (string, error) {
 
 // ComputeMD5Sum computes the MD5 sum of a file
 func ComputeMD5Sum(filename string) (string, error) {
-	return computeFileSum("alpm_compute_md5sum", filename)
+	return computeFileSum(lib.AlpmComputeMd5sum, filename)
 }
 
 // ComputeSHA256Sum computes the SHA256 sum of a file
 func ComputeSHA256Sum(filename string) (string, error) {
-	return computeFileSum("alpm_compute_sha256sum", filename)
+	return computeFileSum(lib.AlpmComputeSha256sum, filename)
 }
 
 func (h *handle) FindGroupPkgs(dbs []Database, name string) ([]Package, error) {

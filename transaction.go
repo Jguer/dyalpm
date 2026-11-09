@@ -242,51 +242,26 @@ func (t *transaction) GetFlags() TransactionFlag {
 }
 
 func (t *transaction) GetAdd() ([]Package, error) {
-	return t.getPackageList("alpm_trans_get_add")
+	return t.getPackageList(lib.AlpmTransGetAdd, "alpm_trans_get_add")
 }
 
 func (t *transaction) GetRemove() ([]Package, error) {
-	return t.getPackageList("alpm_trans_get_remove")
+	return t.getPackageList(lib.AlpmTransGetRemove, "alpm_trans_get_remove")
 }
 
-func (t *transaction) getPackageList(funcName string) ([]Package, error) {
+func (t *transaction) getPackageList(fn func(uintptr) uintptr, name string) ([]Package, error) {
 	if t.handle.ptr == 0 {
 		return nil, ErrInvalidHandle
 	}
-
-	switch funcName {
-	case "alpm_trans_get_add", "alpm_trans_get_remove":
-	default:
-		return nil, stderrors.New("missing function: " + funcName)
+	if fn == nil {
+		return nil, stderrors.New("missing function: " + name)
 	}
 
-	var getFn func(uintptr) uintptr
-	if funcName == "alpm_trans_get_add" {
-		getFn = lib.AlpmTransGetAdd
-	} else {
-		getFn = lib.AlpmTransGetRemove
-	}
-	if getFn == nil {
-		return nil, stderrors.New("missing function: " + funcName)
-	}
-
-	listPtr := getFn(t.handle.ptr)
-	if listPtr == 0 {
+	pkgs := collectList(alpmlist.NewList(fn(t.handle.ptr)), func(ptr uintptr) Package {
+		return newPackage(ptr, t.handle)
+	})
+	if pkgs == nil {
 		return []Package{}, nil
 	}
-
-	alpmList := alpmlist.NewList(listPtr)
-	if alpmList == nil {
-		return []Package{}, nil
-	}
-
-	var pkgs []Package
-	for item := alpmList; item != nil && item.Ptr() != 0; item = item.Next() {
-		pkgPtr := item.Data()
-		if pkgPtr != 0 {
-			pkgs = append(pkgs, newPackage(pkgPtr, t.handle))
-		}
-	}
-
 	return pkgs, nil
 }

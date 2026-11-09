@@ -237,23 +237,11 @@ func (h *handle) StrError(errno dyerrors.Errno) string {
 }
 
 func (h *handle) Root() string {
-	if h.ptr == 0 {
-		return ""
-	}
-	if lib.AlpmOptionGetRoot == nil {
-		return ""
-	}
-	return lib.PtrToString(lib.AlpmOptionGetRoot(h.ptr))
+	return h.getOptionStr(lib.AlpmOptionGetRoot)
 }
 
 func (h *handle) DBPath() string {
-	if h.ptr == 0 {
-		return ""
-	}
-	if lib.AlpmOptionGetDbpath == nil {
-		return ""
-	}
-	return lib.PtrToString(lib.AlpmOptionGetDbpath(h.ptr))
+	return h.getOptionStr(lib.AlpmOptionGetDbpath)
 }
 
 func (h *handle) getLocalDB() (Database, error) {

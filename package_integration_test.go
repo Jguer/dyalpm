@@ -5,6 +5,8 @@ package dyalpm
 import (
 	"io"
 	"testing"
+
+	"github.com/Jguer/dyalpm/internal/lib"
 )
 
 func TestPackage_MetadataAndFileAccess(t *testing.T) {
@@ -103,12 +105,12 @@ func TestPackage_MoreValueMethods(t *testing.T) {
 		t.Fatalf("package download size should be non-negative: %d", size)
 	}
 
-	// These used to fail silently with "missing function" and always return nothing.
-	for _, name := range []string{"alpm_pkg_get_checkdepends", "alpm_pkg_get_makedepends"} {
-		if _, err := pkgImpl.getDependencyList(name); err != nil {
-			t.Fatalf("getDependencyList(%s): %v", name, err)
-		}
+	// CheckDepends/MakeDepends used to have no binding and always returned nothing.
+	if lib.AlpmPkgGetCheckdepends == nil || lib.AlpmPkgGetMakedepends == nil {
+		t.Fatal("checkdepends/makedepends bindings did not resolve")
 	}
+	_ = pkgImpl.CheckDepends()
+	_ = pkgImpl.MakeDepends()
 	replaces := pkgImpl.Replaces()
 	if len(replaces) == 0 {
 		t.Logf("package %q has no replacements", pkg.Name())
