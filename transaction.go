@@ -2,7 +2,9 @@ package dyalpm
 
 import (
 	stderrors "errors"
+	"fmt"
 
+	"github.com/Jguer/dyalpm/internal/dyerrors"
 	"github.com/Jguer/dyalpm/internal/lib"
 	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
@@ -66,37 +68,27 @@ type transaction struct {
 	handle *handle
 }
 
-func (t *transaction) getTransactionList(funcName string, failErr error) (*alpmlist.List, error) {
-	var fn func(uintptr, *uintptr) int32
-	switch funcName {
-	case "alpm_trans_prepare":
-		fn = lib.AlpmTransPrepare
-	case "alpm_trans_commit":
-		fn = lib.AlpmTransCommit
-	default:
-		return nil, stderrors.New("missing function: " + funcName)
-	}
-
+// runWithData calls alpm_trans_prepare or alpm_trans_commit. libalpm fills data
+// only on failure, and the item type depends on the errno that was set.
+func (t *transaction) runWithData(fn func(uintptr, *uintptr) int32, name string, failErr error) (*alpmlist.List, dyerrors.Errno, error) {
 	if fn == nil {
-		return nil, stderrors.New("missing function: " + funcName)
+		return nil, dyerrors.ErrOK, stderrors.New("missing function: " + name)
 	}
 
-	var dataListPtr uintptr
-	result := fn(t.handle.ptr, &dataListPtr)
-	if result != 0 {
-		return nil, failErr
+	var data uintptr
+	if fn(t.handle.ptr, &data) == 0 {
+		return nil, dyerrors.ErrOK, nil
 	}
+	errno := t.handle.Errno()
+	return alpmlist.NewList(data), errno, fmt.Errorf("%w: %w", failErr, errno)
+}
 
-	if dataListPtr == 0 {
-		return nil, nil
+// freeItems frees each item of a libalpm-owned result list, then the list itself.
+func freeItems(l *alpmlist.List, free func(uintptr)) {
+	for item := l; item != nil; item = item.Next() {
+		free(item.Data())
 	}
-
-	alpmList := alpmlist.NewList(dataListPtr)
-	if alpmList == nil {
-		return nil, nil
-	}
-
-	return alpmList, nil
+	l.Free()
 }
 
 // NewTransaction creates a new transaction for the given handle
@@ -124,40 +116,42 @@ func (t *transaction) Init(flags TransactionFlag) error {
 	return nil
 }
 
+// Prepare prepares the transaction. On ErrUnsatisfiedDeps it also returns the
+// missing dependencies; the caller owns them and should call Free on each.
 func (t *transaction) Prepare() ([]DepMissing, error) {
 	if t.handle.ptr == 0 {
 		return nil, ErrInvalidHandle
 	}
 
-	alpmList, err := t.getTransactionList("alpm_trans_prepare", ErrTransactionPrepareFailed)
-	if err != nil || alpmList == nil {
-		return []DepMissing{}, err
+	data, errno, err := t.runWithData(lib.AlpmTransPrepare, "alpm_trans_prepare", ErrTransactionPrepareFailed)
+	switch errno {
+	case dyerrors.ErrUnsatisfiedDeps:
+		defer data.Free()
+		return collectList(data, func(ptr uintptr) DepMissing { return newDepMissing(ptr) }), err
+	case dyerrors.ErrConflictingDeps:
+		freeItems(data, func(ptr uintptr) { lib.AlpmConflictFree(ptr) })
+	case dyerrors.ErrPkgInvalidArch:
+		freeItems(data, lib.Free)
 	}
-	defer alpmList.Free()
-
-	missing := collectList(alpmList, func(ptr uintptr) DepMissing {
-		return newDepMissing(ptr)
-	})
-
-	return missing, nil
+	return []DepMissing{}, err
 }
 
+// Commit commits the transaction. On ErrFileConflicts it also returns the
+// conflicts; the caller owns them and should call Free on each.
 func (t *transaction) Commit() ([]FileConflict, error) {
 	if t.handle.ptr == 0 {
 		return nil, ErrInvalidHandle
 	}
 
-	alpmList, err := t.getTransactionList("alpm_trans_commit", ErrTransactionCommitFailed)
-	if err != nil || alpmList == nil {
-		return []FileConflict{}, err
+	data, errno, err := t.runWithData(lib.AlpmTransCommit, "alpm_trans_commit", ErrTransactionCommitFailed)
+	switch errno {
+	case dyerrors.ErrFileConflicts:
+		defer data.Free()
+		return collectList(data, func(ptr uintptr) FileConflict { return newFileConflict(ptr) }), err
+	case dyerrors.ErrPkgInvalid:
+		freeItems(data, lib.Free)
 	}
-	defer alpmList.Free()
-
-	conflicts := collectList(alpmList, func(ptr uintptr) FileConflict {
-		return newFileConflict(ptr)
-	})
-
-	return conflicts, nil
+	return []FileConflict{}, err
 }
 
 func (t *transaction) Release() error {
