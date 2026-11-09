@@ -2,6 +2,7 @@ package dyalpm
 
 import (
 	stderrors "errors"
+	"fmt"
 	"runtime"
 	"unsafe"
 
@@ -330,55 +331,47 @@ func (h *handle) SyncDBByName(name string) (Database, error) {
 	return nil, stderrors.New("database not found: " + name)
 }
 
+// transErr wraps a transaction sentinel error with the libalpm errno.
+func (h *handle) transErr(sentinel error) error {
+	return fmt.Errorf("%w: %w", sentinel, h.Errno())
+}
+
 func (h *handle) TransInit(flags TransactionFlag) error {
 	if h.ptr == 0 {
-		return stderrors.New("invalid handle")
+		return ErrInvalidHandle
 	}
 	if lib.AlpmTransInit == nil {
 		return stderrors.New("missing function: alpm_trans_init")
 	}
-
-	result := lib.AlpmTransInit(h.ptr, clampIntToInt32(int(flags)))
-	if result != 0 {
-		return stderrors.New("failed to initialize transaction")
+	if lib.AlpmTransInit(h.ptr, clampIntToInt32(int(flags))) != 0 {
+		return h.transErr(ErrTransactionInitFailed)
 	}
-
 	return nil
 }
 
 func (h *handle) TransRelease() error {
 	if h.ptr == 0 {
-		return stderrors.New("invalid handle")
+		return ErrInvalidHandle
 	}
 	if lib.AlpmTransRelease == nil {
 		return stderrors.New("missing function: alpm_trans_release")
 	}
-
-	result := lib.AlpmTransRelease(h.ptr)
-	if result != 0 {
-		return stderrors.New("failed to release transaction")
+	if lib.AlpmTransRelease(h.ptr) != 0 {
+		return h.transErr(ErrTransactionReleaseFailed)
 	}
-
 	return nil
 }
 
 func (h *handle) SyncSysupgrade(enableDowngrade bool) error {
 	if h.ptr == 0 {
-		return stderrors.New("invalid handle")
+		return ErrInvalidHandle
 	}
 	if lib.AlpmSyncSysupgrade == nil {
 		return stderrors.New("missing function: alpm_sync_sysupgrade")
 	}
-
-	down := int32(0)
-	if enableDowngrade {
-		down = 1
+	if lib.AlpmSyncSysupgrade(h.ptr, clampIntToInt32(lib.BoolToInt(enableDowngrade))) != 0 {
+		return h.transErr(ErrSysupgradeFailed)
 	}
-	result := lib.AlpmSyncSysupgrade(h.ptr, down)
-	if result != 0 {
-		return stderrors.New("failed to sync sysupgrade")
-	}
-
 	return nil
 }
 
