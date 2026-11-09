@@ -17,8 +17,8 @@ func CString(s string) []byte {
 	return buf
 }
 
-// PtrToString converts a C string pointer to a Go string
-// This function finds the null terminator to determine the length
+// PtrToString copies a C string into a Go string.
+// It copies so the result stays valid after libalpm frees or reuses the memory.
 func PtrToString(ptr uintptr) string {
 	if ptr == 0 {
 		return ""
@@ -39,7 +39,7 @@ func PtrToString(ptr uintptr) string {
 	if n == 0 {
 		return ""
 	}
-	return unsafe.String(start, n)
+	return string(unsafe.Slice(start, n))
 }
 
 // PtrToStringWithLen converts a C string pointer with known length to Go string
