@@ -27,6 +27,27 @@ func TestInitializeAndRelease(t *testing.T) {
 	}
 }
 
+// A failed lookup leaves a sticky errno; Release must still succeed and not run twice.
+func TestReleaseAfterFailedLookup(t *testing.T) {
+	h, err := alpm.Initialize("/", "/var/lib/pacman")
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+	localDB, err := h.LocalDB()
+	if err != nil {
+		t.Fatalf("Failed to get local DB: %v", err)
+	}
+	if localDB.Pkg("dyalpm-no-such-package") != nil {
+		t.Fatal("expected missing package")
+	}
+	if err := h.Release(); err != nil {
+		t.Fatalf("Release failed: %v", err)
+	}
+	if err := h.Release(); err == nil {
+		t.Fatal("second Release should report already released")
+	}
+}
+
 func TestLocalDB(t *testing.T) {
 	h, err := alpm.Initialize("/", "/var/lib/pacman")
 	if err != nil {

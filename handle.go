@@ -199,19 +199,16 @@ func (h *handle) Release() error {
 		return stderrors.New("handle already released")
 	}
 
-	oldPtr := h.ptr
-
 	if lib.AlpmRelease == nil {
 		return stderrors.New("missing function: alpm_release")
 	}
 
-	r1 := lib.AlpmRelease(h.ptr)
-	errno := lib.AlpmErrno(h.ptr)
-	if errno != 0 || r1 != 0 {
-		return stderrors.New("failed to release handle")
+	// On failure the handle is still alive; on success it is freed, so never touch it after.
+	if lib.AlpmRelease(h.ptr) != 0 {
+		return dyerrors.NewError(h.Errno(), "failed to release handle")
 	}
 
-	unregisterCallbackSet(oldPtr)
+	unregisterCallbackSet(h.ptr)
 	h.ptr = 0
 	return nil
 }
