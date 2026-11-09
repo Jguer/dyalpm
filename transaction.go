@@ -2,7 +2,6 @@ package dyalpm
 
 import (
 	stderrors "errors"
-	"fmt"
 
 	"github.com/Jguer/dyalpm/internal/dyerrors"
 	"github.com/Jguer/dyalpm/internal/lib"
@@ -79,8 +78,7 @@ func (t *transaction) runWithData(fn func(uintptr, *uintptr) int32, name string,
 	if fn(t.handle.ptr, &data) == 0 {
 		return nil, dyerrors.ErrOK, nil
 	}
-	errno := t.handle.Errno()
-	return alpmlist.NewList(data), errno, fmt.Errorf("%w: %w", failErr, errno)
+	return alpmlist.NewList(data), t.handle.Errno(), t.handle.transErr(failErr)
 }
 
 // freeItems frees each item of a libalpm-owned result list, then the list itself.
@@ -100,20 +98,7 @@ func NewTransaction(h Handle) Transaction {
 }
 
 func (t *transaction) Init(flags TransactionFlag) error {
-	if t.handle.ptr == 0 {
-		return ErrInvalidHandle
-	}
-
-	if lib.AlpmTransInit == nil {
-		return stderrors.New("missing function: alpm_trans_init")
-	}
-
-	result := lib.AlpmTransInit(t.handle.ptr, clampIntToInt32(int(flags)))
-	if result != 0 {
-		return ErrTransactionInitFailed
-	}
-
-	return nil
+	return t.handle.TransInit(flags)
 }
 
 // Prepare prepares the transaction. On ErrUnsatisfiedDeps it also returns the
@@ -155,20 +140,7 @@ func (t *transaction) Commit() ([]FileConflict, error) {
 }
 
 func (t *transaction) Release() error {
-	if t.handle.ptr == 0 {
-		return ErrInvalidHandle
-	}
-
-	if lib.AlpmTransRelease == nil {
-		return stderrors.New("missing function: alpm_trans_release")
-	}
-
-	result := lib.AlpmTransRelease(t.handle.ptr)
-	if result != 0 {
-		return ErrTransactionReleaseFailed
-	}
-
-	return nil
+	return t.handle.TransRelease()
 }
 
 func (t *transaction) AddPkg(pkg Package) error {
@@ -183,7 +155,7 @@ func (t *transaction) AddPkg(pkg Package) error {
 	pkgImpl := pkg.(*package_)
 	result := lib.AlpmAddPkg(t.handle.ptr, pkgImpl.ptr)
 	if result != 0 {
-		return ErrAddPackageFailed
+		return t.handle.transErr(ErrAddPackageFailed)
 	}
 
 	return nil
@@ -201,31 +173,14 @@ func (t *transaction) RemovePkg(pkg Package) error {
 	pkgImpl := pkg.(*package_)
 	result := lib.AlpmRemovePkg(t.handle.ptr, pkgImpl.ptr)
 	if result != 0 {
-		return ErrRemovePackageFailed
+		return t.handle.transErr(ErrRemovePackageFailed)
 	}
 
 	return nil
 }
 
 func (t *transaction) SyncSysupgrade(enableDowngrade bool) error {
-	if t.handle.ptr == 0 {
-		return ErrInvalidHandle
-	}
-
-	if lib.AlpmSyncSysupgrade == nil {
-		return stderrors.New("missing function: alpm_sync_sysupgrade")
-	}
-
-	downgrade := int32(0)
-	if enableDowngrade {
-		downgrade = 1
-	}
-	result := lib.AlpmSyncSysupgrade(t.handle.ptr, downgrade)
-	if result != 0 {
-		return ErrSysupgradeFailed
-	}
-
-	return nil
+	return t.handle.SyncSysupgrade(enableDowngrade)
 }
 
 func (t *transaction) GetFlags() TransactionFlag {
