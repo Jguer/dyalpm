@@ -3,6 +3,7 @@
 package dyalpm
 
 import (
+	"errors"
 	"testing"
 	"unsafe"
 )
@@ -189,4 +190,26 @@ func TestDepend_OptionalDescription(t *testing.T) {
 		t.Skip("no installed package has optional dependencies")
 	}
 	t.Fatalf("none of %d optional dependencies had a description", withOpt)
+}
+
+func TestPackageIterator_FindSatisfier(t *testing.T) {
+	h := mustInitializeTestHandle(t)
+	localDB := mustLocalDB(t, h)
+	if localDB.Pkg("bash") == nil {
+		t.Skip("bash must be installed")
+	}
+
+	// bash provides sh; check both the list-backed cache and a slice-backed search result.
+	for name, it := range map[string]PackageIterator{
+		"pkgcache": localDB.PkgCache(),
+		"search":   localDB.Search([]string{"bash"}),
+	} {
+		pkg, err := it.FindSatisfier("sh")
+		if err != nil || pkg.Name() != "bash" {
+			t.Errorf("%s: FindSatisfier(sh) = %v, %v; want bash", name, pkg, err)
+		}
+		if _, err := it.FindSatisfier("dyalpm-no-such-dep"); !errors.Is(err, ErrPackageNotFound) {
+			t.Errorf("%s: missing dep error = %v, want ErrPackageNotFound", name, err)
+		}
+	}
 }
