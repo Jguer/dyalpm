@@ -72,36 +72,52 @@ func newDependency(ptr uintptr) *dependency {
 	}
 }
 
+// cDepend mirrors alpm_depend_t.
+type cDepend struct {
+	Name     uintptr
+	Version  uintptr
+	Desc     uintptr
+	NameHash uint64
+	Mod      int32
+}
+
+func (d *dependency) c() *cDepend {
+	return (*cDepend)(unsafe.Pointer(d.ptr))
+}
+
 func (d *dependency) GetName() string {
 	if d.ptr == 0 {
 		return ""
 	}
-	// alpm_depend_t structure: char *name at offset 0
-	base := unsafe.Pointer(d.ptr)
-	namePtr := *(*uintptr)(base)
-	return lib.PtrToString(namePtr)
+	return lib.PtrToString(d.c().Name)
 }
 
 func (d *dependency) GetVersion() string {
 	if d.ptr == 0 {
 		return ""
 	}
-	// alpm_depend_t structure: char *version at offset of pointer size
-	base := unsafe.Pointer(d.ptr)
-	versionPtr := *(*uintptr)(unsafe.Add(base, unsafe.Sizeof(uintptr(0))))
-	return lib.PtrToString(versionPtr)
+	return lib.PtrToString(d.c().Version)
 }
 
 func (d *dependency) GetMod() DepMod {
 	if d.ptr == 0 {
 		return DepModAny
 	}
-	// alpm_depend_t structure: alpm_depmod_t mod is after name_hash (unsigned long)
-	// Offset: name (ptr) + version (ptr) + desc (ptr) + name_hash (ulong) = 3*ptr + ulong
-	modOffset := 3*unsafe.Sizeof(uintptr(0)) + unsafe.Sizeof(uint64(0))
-	base := unsafe.Pointer(d.ptr)
-	mod := *(*int)(unsafe.Add(base, modOffset))
-	return DepMod(mod)
+	return DepMod(d.c().Mod)
+}
+
+func (d *dependency) toDepend() Depend {
+	if d.ptr == 0 {
+		return Depend{}
+	}
+	c := d.c()
+	return Depend{
+		Name:        lib.PtrToString(c.Name),
+		Version:     lib.PtrToString(c.Version),
+		Description: lib.PtrToString(c.Desc),
+		NameHash:    c.NameHash,
+		Mod:         DepMod(c.Mod),
+	}
 }
 
 func (d *dependency) ComputeString() string {
@@ -257,11 +273,7 @@ func (c *conflict) GetReason() Dependency {
 func toDependList(deps []Dependency) []Depend {
 	result := make([]Depend, len(deps))
 	for i, dep := range deps {
-		result[i] = Depend{
-			Name:    dep.GetName(),
-			Version: dep.GetVersion(),
-			Mod:     dep.GetMod(),
-		}
+		result[i] = dep.(*dependency).toDepend()
 	}
 	return result
 }

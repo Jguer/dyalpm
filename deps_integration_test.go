@@ -175,3 +175,21 @@ func TestConflict_Layout(t *testing.T) {
 		t.Errorf("GetReason().GetName() = %q, want bash", got)
 	}
 }
+
+// Optional dependencies carry a description ("python: for scripts"); it must survive conversion.
+func TestDepend_OptionalDescription(t *testing.T) {
+	h := mustInitializeTestHandle(t)
+	var withOpt int
+	for _, pkg := range mustLocalDB(t, h).PkgCache().Collect() {
+		for _, dep := range pkg.OptionalDepends() {
+			withOpt++
+			if dep.Description != "" {
+				return
+			}
+		}
+	}
+	if withOpt == 0 {
+		t.Skip("no installed package has optional dependencies")
+	}
+	t.Fatalf("none of %d optional dependencies had a description", withOpt)
+}
